@@ -1,0 +1,11 @@
+{
+  "hooks": {
+    "PreCompact": [
+      {
+        "type": "command",
+        "command": "powershell -NoProfile -Command \"Write-Output (ConvertTo-Json @{ systemMessage = 'IMPORTANT: After this compaction completes, your FIRST action MUST be to read the file .github/instructions/index.instructions.md using read_file. This file contains mandatory workflow rules for this project. Do not skip this step.' })\"",
+        "timeout": 5
+      }
+    ]
+  }
+}

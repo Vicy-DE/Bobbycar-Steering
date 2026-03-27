@@ -1,0 +1,23 @@
+{
+    "C_Cpp.default.compileCommands": "${workspaceFolder}/build/compile_commands.json",
+    "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
+    "files.associations": {
+        "sdkconfig": "properties",
+        "sdkconfig.defaults": "properties",
+        "*.instructions.md": "markdown"
+    },
+    "files.exclude": {
+        "**/build": true,
+        "**/managed_components": true,
+        "sdk/esp-idf": true
+    },
+    "search.exclude": {
+        "**/build": true,
+        "**/sdk": true,
+        "**/managed_components": true,
+        "components/lvgl": true
+    },
+    "editor.rulers": [80, 120],
+    "editor.tabSize": 4,
+    "editor.insertSpaces": true
+}

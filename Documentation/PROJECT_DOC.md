@@ -1,0 +1,158 @@
+# Project Documentation — Bobbycar-Steering
+
+**Last updated:** 2026-03-27 (v0.2)
+**IDF Target:** `esp32c3` / `esp32h2` / `esp32c5`
+**ESP-IDF Version:** v5.4
+
+---
+
+## 1. Project Overview
+
+Cross-platform steering controller firmware for the Bobbycar project. Targets ESP32 SuperMini development boards (ESP32-C3, ESP32-H2, ESP32-C5) with LVGL-based display output and PWM servo control. Built on ESP-IDF v5.4 with FreeRTOS.
+
+Current state: ADC sensor readout and ST7796S 3.5" SPI TFT display with LVGL dashboard UI.
+
+**Hardware source:** [AliExpress — ESP32 SuperMini Dev Boards](https://de.aliexpress.com/item/1005009495310442.html)
+
+---
+
+## 2. Hardware Platform
+
+### Target SoCs
+
+| SoC | CPU | Clock | SRAM | Flash | Connectivity |
+|-----|-----|-------|------|-------|-------------|
+| ESP32-C3 | 32-bit RISC-V single-core | 160 MHz | 400 KB | 4 MB SiP | Wi-Fi 4 (802.11 b/g/n) + BLE 5 |
+| ESP32-H2 | 32-bit RISC-V single-core | 96 MHz | 320 KB | 2/4 MB SiP | BLE 5 + IEEE 802.15.4 (Zigbee/Thread) |
+| ESP32-C5 | 32-bit RISC-V single-core | 240 MHz | 384 KB | External PSRAM support | Wi-Fi 6 (802.11ax, 2.4+5 GHz) + BLE 5 + 802.15.4 |
+
+### Development Board
+
+ESP32 SuperMini form factor with:
+- USB Type-C connector (USB-CDC for programming and serial)
+- Built-in USB-JTAG on C3/C5 for debugging
+- Minimal external components (LED, BOOT/RST buttons)
+- Castellated pads for breadboard or SMD mounting
+
+### Debug Interface
+
+- **Flashing:** USB-CDC via built-in USB (no external programmer needed)
+- **JTAG:** Built-in USB-JTAG on ESP32-C3 and ESP32-C5
+- **Serial:** USB-CDC at 115200 baud for log output
+
+---
+
+## 3. Software Architecture
+
+```
+┌────────────────────────────────────┐
+│          ESP-IDF v5.4              │
+│  ┌──────────┐  ┌─────────────┐    │
+│  │ FreeRTOS │  │  Wi-Fi/BLE  │    │
+│  └──────────┘  └─────────────┘    │
+├────────────────────────────────────┤
+│           Components               │
+│  ┌──────────┐  ┌─────────────┐    │
+│  │ steering │  │   display   │    │
+│  │  (PWM)   │  │ (LVGL+drv) │    │
+│  └──────────┘  └─────────────┘    │
+├────────────────────────────────────┤
+│              main/                 │
+│         app_main() entry           │
+│   ADC readout + LVGL UI loop       │
+└────────────────────────────────────┘
+```
+
+### Boot Flow
+
+1. ESP-IDF bootloader loads application
+2. `app_main()` initialises peripherals
+3. FreeRTOS tasks created for steering control and display
+4. Main loop runs via FreeRTOS scheduler
+
+---
+
+## 4. Key Modules
+
+| Module / Component | Responsibility |
+|---|---|
+| `main/main.c` | Application entry point — ADC init, display init, LVGL UI creation, main loop (ADC read + UI update + LVGL timer) |
+| `main/pin_config.h` | Per-target GPIO pin assignments (SPI display, I2C touch, TWAI, ADC) via `#if CONFIG_IDF_TARGET_*` guards |
+| `components/display/` | ST7796S 3.5" SPI TFT driver — SPI bus init, esp_lcd panel, LVGL v9 flush integration, backlight, landscape rotation |
+| `components/steering/` | Steering servo control — PWM output via LEDC peripheral (planned) |
+| `components/lvgl/` | LVGL v9.2 graphics library (git submodule) |
+
+---
+
+## 5. Build System
+
+ESP-IDF CMake-based build system with `idf.py` frontend.
+
+| Command | Purpose |
+|---------|---------|
+| `idf.py set-target esp32c3` | Select target SoC |
+| `idf.py build` | Build firmware |
+| `idf.py -p COMx flash` | Flash via USB-CDC |
+| `idf.py -p COMx monitor` | Serial monitor (115200 baud) |
+| `idf.py menuconfig` | Configure sdkconfig options |
+| `idf.py fullclean` | Clean build directory |
+
+### Configuration
+
+- `sdkconfig.defaults` — common defaults for all targets
+- `sdkconfig.defaults.esp32c3` — C3-specific defaults (if needed)
+- `sdkconfig.defaults.esp32h2` — H2-specific defaults (if needed)
+- `sdkconfig.defaults.esp32c5` — C5-specific defaults (if needed)
+
+---
+
+## 6. Flashing & Debug Toolchain
+
+| Tool | Source |
+|------|--------|
+| idf.py | ESP-IDF build/flash/monitor frontend |
+| OpenOCD | Bundled with ESP-IDF for JTAG debug |
+| GDB | `riscv32-esp-elf-gdb` installed by ESP-IDF |
+
+### Flash via USB-CDC
+
+```powershell
+idf.py -p COM<N> flash monitor
+```
+
+If auto-reset fails: hold BOOT → press RST → release BOOT → flash.
+
+---
+
+## 7. Cross-Platform Support
+
+| Feature | ESP32-C3 | ESP32-H2 | ESP32-C5 |
+|---------|----------|----------|----------|
+| Wi-Fi | 802.11 b/g/n | — | 802.11ax (Wi-Fi 6) |
+| Bluetooth | BLE 5 | BLE 5 | BLE 5 |
+| 802.15.4 | — | Zigbee/Thread | Zigbee/Thread |
+| Max Clock | 160 MHz | 96 MHz | 240 MHz |
+| GPIOs | 22 | 19 | 29 |
+| USB | USB-Serial/JTAG | USB-Serial/JTAG | USB-Serial/JTAG |
+
+Target-specific code uses `#if CONFIG_IDF_TARGET_ESP32C3` / `ESP32H2` / `ESP32C5` guards.
+
+---
+
+## 8. Known Limitations / Open Issues
+
+- Steering component not yet implemented
+- Touch driver not yet implemented (I2C pins reserved)
+- ESP32-C5 support in ESP-IDF may be in preview status
+- ESP32-H2 has no Wi-Fi — connectivity limited to BLE and 802.15.4
+- Display colours may require MADCTL tuning per physical display revision
+- ADC readings are raw 12-bit values — no calibration or voltage conversion applied yet
+
+---
+
+## 9. Revision History (summary)
+
+| Date | Summary |
+|---|---|
+| 2026-03-27 | ADC sensor readout + ST7796S display driver + LVGL dashboard UI + pinout docs |
+| 2026-03-27 | Initial project setup — ESP-IDF + LVGL submodules, cross-platform structure, requirements |

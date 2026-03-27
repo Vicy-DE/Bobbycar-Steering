@@ -1,0 +1,32 @@
+# Build outputs
+build/
+managed_components/
+sdkconfig.old
+*.elf
+*.bin
+*.hex
+*.map
+
+# SDK build artifacts (the submodule itself is tracked via .gitmodules)
+# sdk/esp-idf/ is a submodule — do NOT ignore it
+
+# IDE
+.idea/
+*.swp
+*~
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# ESP-IDF generated
+dependencies.lock
+
+# Ensure .github/instructions/ is tracked
+!.github/instructions/
+!.github/instructions/**

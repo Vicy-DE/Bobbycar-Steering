@@ -1,0 +1,87 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build (ESP-IDF)",
+            "type": "shell",
+            "command": "idf.py build",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": ["$gcc"],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "Flash (ESP-IDF)",
+            "type": "shell",
+            "command": "idf.py -p ${input:comPort} flash",
+            "group": "build",
+            "problemMatcher": [],
+            "dependsOn": "Build (ESP-IDF)"
+        },
+        {
+            "label": "Monitor (ESP-IDF)",
+            "type": "shell",
+            "command": "idf.py -p ${input:comPort} monitor",
+            "group": "test",
+            "problemMatcher": [],
+            "isBackground": true
+        },
+        {
+            "label": "Flash + Monitor",
+            "type": "shell",
+            "command": "idf.py -p ${input:comPort} flash monitor",
+            "group": "build",
+            "problemMatcher": [],
+            "dependsOn": "Build (ESP-IDF)"
+        },
+        {
+            "label": "Set Target: ESP32-C3",
+            "type": "shell",
+            "command": "idf.py set-target esp32c3",
+            "group": "build",
+            "problemMatcher": []
+        },
+        {
+            "label": "Set Target: ESP32-H2",
+            "type": "shell",
+            "command": "idf.py set-target esp32h2",
+            "group": "build",
+            "problemMatcher": []
+        },
+        {
+            "label": "Set Target: ESP32-C5",
+            "type": "shell",
+            "command": "idf.py set-target esp32c5",
+            "group": "build",
+            "problemMatcher": []
+        },
+        {
+            "label": "Clean Build",
+            "type": "shell",
+            "command": "idf.py fullclean",
+            "group": "build",
+            "problemMatcher": []
+        },
+        {
+            "label": "Menuconfig",
+            "type": "shell",
+            "command": "idf.py menuconfig",
+            "group": "build",
+            "problemMatcher": []
+        }
+    ],
+    "inputs": [
+        {
+            "id": "comPort",
+            "type": "promptString",
+            "description": "COM port for the ESP32 board (e.g., COM3)",
+            "default": "COM3"
+        }
+    ]
+}

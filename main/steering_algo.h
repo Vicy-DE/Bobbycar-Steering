@@ -15,6 +15,10 @@
 #define L_STEERING_WIDTH    20.0f
 #define L_STEERING_TO_WHEEL  5.0f
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * @brief Convert radians to degrees.
  *
@@ -47,3 +51,7 @@ void calc_torque_per_wheel(int throttle,
                            float alpha_steer,
                            int torque_regulated,
                            int *torque);
+
+#ifdef __cplusplus
+}
+#endif

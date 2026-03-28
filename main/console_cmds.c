@@ -11,6 +11,8 @@
 #include "console.h"
 #include "motor.h"
 #include "steering_algo.h"
+#include "bp32_config.h"
+#include "ble_console.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -19,6 +21,10 @@
 #include "esp_log.h"
 #include "esp_chip_info.h"
 #include "esp_system.h"
+
+/* Redirect printf to console_printf so output is mirrored
+ * to both UART and BLE NUS when a client is connected. */
+#define printf console_printf
 
 /* -------------------------------------------------------- */
 /*  Driving state                                           */
@@ -188,13 +194,13 @@ static void cmd_getb(int argc, char *argv[])
     (void)argc; (void)argv;
     const char *names[] = {"FL","FR","RL","RR"};
     for (int i = 0; i < MOTOR_COUNT; i++) {
-        motor_t *m = motor_get(i);
-        if (!m) {
+        motor_state_t st;
+        if (!motor_get_state(i, &st)) {
             continue;
         }
         printf("%s: T=%d spd=%d en=%d\r\n",
-               names[i], m->torque,
-               m->speed_meas, m->enabled);
+               names[i], st.torque,
+               st.speed_meas, st.enabled);
     }
 }
 
@@ -318,7 +324,7 @@ static void cmd_ver(int argc, char *argv[])
     (void)argc; (void)argv;
     esp_chip_info_t ci;
     esp_chip_info(&ci);
-    printf("Bobbycar-Steering v0.5\r\n");
+    printf("Bobbycar-Steering v0.7\r\n");
     printf("IDF: %s\r\n", esp_get_idf_version());
     printf("Cores: %d  Rev: %d\r\n", ci.cores, ci.revision);
 }
@@ -334,6 +340,47 @@ static void cmd_reset(int argc, char *argv[])
     printf("Resetting...\r\n");
     fflush(stdout);
     esp_restart();
+}
+
+/* -------------------------------------------------------- */
+/*  Config commands                                         */
+/* -------------------------------------------------------- */
+
+/**
+ * @brief Reload Bluepad32 config from LittleFS.
+ *
+ * @sideeffects Reads INI files from LittleFS.
+ */
+static void cmd_cfgload(int argc, char *argv[])
+{
+    (void)argc; (void)argv;
+    bp32_config_load();
+    const bp32_general_config_t *g =
+        bp32_config_get_general();
+    const bp32_button_map_t *b =
+        bp32_config_get_buttonmap();
+    printf("Config loaded:\r\n");
+    printf("  max_dev=%d filter_kb=%d "
+           "auto_recon=%d\r\n",
+           g->max_devices,
+           g->filter_keyboards,
+           g->auto_reconnect);
+    printf("  throttle_axis=%d steering_axis=%d\r\n",
+           b->throttle_axis, b->steering_axis);
+    printf("  boost=0x%04x brake=0x%04x\r\n",
+           b->boost_button, b->brake_button);
+}
+
+/**
+ * @brief Save Bluepad32 config to LittleFS.
+ *
+ * @sideeffects Writes INI files to LittleFS.
+ */
+static void cmd_cfgsave(int argc, char *argv[])
+{
+    (void)argc; (void)argv;
+    bp32_config_save();
+    printf("Config saved\r\n");
 }
 
 /* -------------------------------------------------------- */
@@ -382,6 +429,10 @@ static const shell_cmd_t s_motor_cmds[] = {
       cmd_getkd },
     { "getpo", "             Get PID output",
       cmd_getpo },
+    { "cfgload","            Reload BP32 config",
+      cmd_cfgload },
+    { "cfgsave","            Save BP32 config",
+      cmd_cfgsave },
 };
 
 #define CMD_COUNT \

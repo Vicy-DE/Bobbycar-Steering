@@ -1,5 +1,49 @@
 # Change Log — Bobbycar-Steering
 
+## [2026-03-29] Power Management, BLE Console, INI Config, C++ Conversion, LVGL Buffer Fix
+
+### What was changed
+- `main/power_mgmt.h` — Created power management API header
+- `main/power_mgmt.c` — Created DFS implementation: `esp_pm_configure()` with per-target min/max frequencies (H2: 32–96 MHz, C3: 80–160 MHz, C5: 80–240 MHz), light sleep disabled (incompatible with BTstack VHCI)
+- `main/ble_console.h` — Created BLE console API: `ble_console_init()`, `console_printf()` dual-output function
+- `main/ble_console.c` — Created Nordic UART Service (NUS) implementation via BTstack GATT server: TX ring buffer (1 KB), RX line buffer (128 bytes), MTU negotiation, incoming data dispatched through `console_exec()`
+- `main/bp32_config.h` — Created Bluepad32 INI configuration API: general config, button mapping, known device structs
+- `main/bp32_config.c` — Created INI-based config management: `bluepad32.ini` (general), `buttonmap.ini` (controls), `devices/*.ini` (known BT addresses with FIFO eviction at 8 devices), default creation on first boot
+- `main/ini_parser.h` — Created minimal INI parser API
+- `main/ini_parser.c` — Created INI file parser: `[sections]`, `key=value`, `#`/`;` comments, `ini_parse_file()` and `ini_write_value()` with in-place update
+- `main/motor.cpp` — Converted from `motor.c` to C++: Motor class with private members, const getters, MotorController singleton, `extern "C"` wrappers
+- `main/steering_algo.cpp` — Converted from `steering_algo.c` to C++: uses `<cmath>`, `static_cast<>`, C-linkage API preserved
+- `main/my_platform.c` — Added `ble_console_init()` and `bp32_config_load()` calls in `on_init_complete` callback
+- `main/console.c` — Updated "Unknown command" message to use `console_printf()` for BLE output
+- `main/console_cmds.c` — Added `#include "ble_console.h"`, `#define printf console_printf` for BLE output; added `cfgload`/`cfgsave` commands; fixed `cmd_ver()` double-escaped `\\r\\n` → `\r\n`; version bumped to v0.7
+- `main/console_cmds_fs.c` — Added `#include "ble_console.h"`, `#define printf console_printf` for BLE output
+- `main/main.c` — Added `power_mgmt_init()` call; version bumped to v0.7
+- `main/CMakeLists.txt` — Added power_mgmt.c, ini_parser.c, bp32_config.c, ble_console.c to SRCS; renamed motor.c→motor.cpp, steering_algo.c→steering_algo.cpp
+- `components/display/display.c` — Reduced `LVGL_BUF_LINES` from 20 to 10 (saves 19,200 bytes of heap for BLE controller init)
+- `components/bluepad32/src/components/bluepad32/bt/uni_bt_service.gatt` — Added NUS service import
+- `components/bluepad32/.../uni_bt_service.gatt.h` — Regenerated with NUS handles 0x0023–0x0028
+- `sdkconfig.defaults` — Added `CONFIG_PM_ENABLE=y`, `CONFIG_FREERTOS_USE_TICKLESS_IDLE=y`, `CONFIG_BT_LE_SLEEP_ENABLE=y`
+- `Documentation/PROJECT_DOC.md` — Updated to v0.7: added CAN bus architecture section, new modules, boot flow, known limitations
+- `Documentation/Requirements/requirements.md` — Added requirements #15-21 (C++ objects, PM, LittleFS test, INI config, BLE console, Android app, CAN bus)
+
+### Why it was changed
+Feature additions: power management reduces idle power via DFS (CPU scales to 32 MHz when idle). BLE console enables wireless terminal access via Nordic UART Service. INI config allows Bluepad32 settings, button mappings, and known devices to persist on LittleFS. C++ conversion encapsulates motor/steering state. LVGL buffer reduction was critical to fix BLE controller init failure caused by heap exhaustion (only 15.7 KB free of 73.9 KB with original 20-line buffers, BLE controller needs ~30 KB).
+
+### What it does / expected behaviour
+- DFS active on boot: CPU scales between 32–96 MHz on ESP32-H2 (logged as "DFS 32-96 MHz")
+- BLE console accepts commands via NUS from any BLE terminal app (e.g., nRF Connect)
+- Console output mirrored to both UART and BLE when NUS client is connected
+- INI config files created with defaults on first boot under `/littlefs/config/`
+- `cfgload` and `cfgsave` commands manage Bluepad32 config at runtime
+- Motor and steering objects use C++ internally with unchanged C API
+- LVGL renders with 10-line buffers (2 × 9,600 bytes), freeing ~19 KB for BLE stack
+- BLE controller initialises successfully: BTstack up and running, Bluepad32 scanning
+
+### Verified
+- Build: OK — ESP32-H2, `idf.py build` clean
+- Flash: OK — COM13, hash verified
+- Debug: OK — Serial monitor confirms: "DFS 32-96 MHz", BLE MAC 10:51:DB:60:AF:04, "BTstack up and running", "Bluepad32 init complete — scanning for gamepads", console responsive, blinky cycling
+
 ## [2026-03-28] UART Console, Motor Objects, Ackermann Steering, XMODEM
 
 ### What was changed

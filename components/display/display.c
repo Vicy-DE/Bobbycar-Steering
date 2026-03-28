@@ -23,7 +23,7 @@ static const char *TAG = "display";
 
 /** Number of lines per partial render buffer. */
 #ifndef LVGL_BUF_LINES
-#define LVGL_BUF_LINES 20
+#define LVGL_BUF_LINES 10
 #endif
 
 static esp_lcd_panel_handle_t s_panel = NULL;

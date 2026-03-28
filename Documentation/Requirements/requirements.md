@@ -1,6 +1,6 @@
 # Requirements — Bobbycar-Steering
 
-**Last updated:** 2026-03-28
+**Last updated:** 2026-03-29
 
 ---
 
@@ -160,6 +160,83 @@
 
 ---
 
+## 15. C++ Motor/Steering Objects — Encapsulation
+
+| Item | Detail |
+|---|---|
+| **Module / Component** | main |
+| **Interface** | N/A (refactor) |
+| **Platform** | All |
+| **Requirements** | <ul><li>Convert `motor.c` and `steering_algo.c` to C++ (`.cpp`)</li><li>`Motor` class with private members and const getters; `MotorController` singleton managing 4 instances</li><li>`extern "C"` wrapper functions for C interop (`motor_init()`, `motor_get_torque()`, etc.)</li><li>`motor_state_t` snapshot struct replaces direct pointer access to internal state</li><li>Steering algorithm uses `<cmath>`, `static_cast<>`, `std::fabsf`/`std::sqrtf`</li><li>All existing C callers continue to work via C-linkage API</li></ul> |
+
+---
+
+## 16. Power Management — Dynamic Frequency Scaling
+
+| Item | Detail |
+|---|---|
+| **Module / Component** | main |
+| **Interface** | N/A (system) |
+| **Platform** | All |
+| **Requirements** | <ul><li>Enable `esp_pm_configure()` with DFS and light sleep</li><li>ESP32-H2: 32–96 MHz, ESP32-C3: 80–160 MHz, ESP32-C5: 80–240 MHz</li><li>FreeRTOS tickless idle (`CONFIG_FREERTOS_USE_TICKLESS_IDLE=y`)</li><li>`CONFIG_PM_ENABLE=y` in sdkconfig.defaults</li><li>CPU scales down to min frequency when idle, wakes on any interrupt</li></ul> |
+
+---
+
+## 17. LittleFS Integration Test — Automated XMODEM Validation
+
+| Item | Detail |
+|---|---|
+| **Module / Component** | Target (test script) |
+| **Interface** | UART / USB-CDC |
+| **Platform** | All |
+| **Requirements** | <ul><li>Port of 1180 `test_xmodem_fatfs.py` adapted for Bobbycar LittleFS</li><li>8 test steps: format, push 3 files, XMODEM send-back and binary compare, delete, mkdir+nested, persistence after reset</li><li>File sizes: 5 KB, 4 KB, 4 KB, 1 KB (within 8 KB XMODEM buffer)</li><li>Deterministic test data via fixed seed 0xDEADBEEF</li><li>Verification via XMODEM send-back (no on-device hash command)</li><li>Script at `Target/test_xmodem_littlefs.py`</li><li>Dependencies: pyserial, xmodem</li></ul> |
+
+---
+
+## 18. Bluepad32 Configuration Files — INI on LittleFS
+
+| Item | Detail |
+|---|---|
+| **Module / Component** | main |
+| **Interface** | LittleFS |
+| **Platform** | All |
+| **Requirements** | <ul><li>Bluepad32 settings stored as `.ini` files on LittleFS</li><li>`/littlefs/config/bluepad32.ini` — general settings (max_devices, scan_timeout, filter_keyboards)</li><li>`/littlefs/config/devices/` — per-device `.ini` files keyed by BT address (autoconnect allowlist)</li><li>`/littlefs/config/buttonmap.ini` — button-to-action mapping for customizing controls</li><li>Minimal INI parser: `[section]`, `key=value`, `#` comments</li><li>Default config created if files are missing</li><li>Console commands `cfgload` and `cfgsave` to reload/persist config</li></ul> |
+
+---
+
+## 19. BLE Console — Nordic UART Service
+
+| Item | Detail |
+|---|---|
+| **Module / Component** | main |
+| **Interface** | BLE (GATT) |
+| **Platform** | All |
+| **Requirements** | <ul><li>BLE GATT server implementing Nordic UART Service (NUS) as alternative to UART console</li><li>NUS UUIDs: Service `6E400001-B5A3-F393-E0A9-E50E24DCCA9E`, RX `6E400002-...`, TX `6E400003-...`</li><li>Route incoming NUS RX data through `console_exec()` for command dispatch</li><li>Responses sent back via NUS TX notify</li><li>Must coexist with Bluepad32 BTstack (use BTstack GATT server API, not NimBLE)</li><li>Console output duplicated to both UART and BLE when NUS client connected</li><li>Max MTU: negotiate up to 247 bytes for efficiency</li></ul> |
+
+---
+
+## 20. Android BLE Update App — Requirements Specification
+
+| Item | Detail |
+|---|---|
+| **Module / Component** | External (Android app) |
+| **Interface** | BLE (NUS) |
+| **Platform** | Android |
+| **Requirements** | <ul><li>Android app connects to ESP32 via BLE NUS</li><li>Provides terminal UI for console commands</li><li>Supports XMODEM file transfer for firmware updates to ESP32</li><li>Can relay firmware updates to other bobbycar devices via ESP32 console (CAN/I2C bridge)</li><li>Target devices: CH32V003 (lights), CH32V203 (steering sensor), trailer MCU</li><li>This is a requirements specification only — implementation is a separate project</li></ul> |
+
+---
+
+## 21. CAN Bus Architecture — Bobbycar Network
+
+| Item | Detail |
+|---|---|
+| **Module / Component** | docs, main (future) |
+| **Interface** | CAN (TWAI) / I2C |
+| **Platform** | All |
+| **Requirements** | <ul><li>Document the bobbycar CAN bus architecture for future implementation</li><li>4× VESC motor controllers on CAN bus (one per wheel)</li><li>CH32V203 with ADC for steering angle sensor + other sensors, connected to CAN</li><li>CH32V003 for I2C-controlled lights, connected via CH32V203 CAN→I2C bridge</li><li>Optional trailer unit on CAN bus</li><li>ESP32 must be able to update CH32V003, CH32V203, and trailer via CAN with custom IAP protocols</li><li>CAN→I2C bridge for updating I2C-connected CH32V003</li><li>TWAI pins already reserved in pin_config.h</li></ul> |
+
+---
+
 ## Traceability Matrix
 
 | Req # | Feature | Depends On |
@@ -178,3 +255,10 @@
 | 12 | XMODEM File Transfer | 11 |
 | 13 | Four-Wheel Motor Objects | 1 |
 | 14 | Ackermann Steering Algorithm | 13 |
+| 15 | C++ Motor/Steering Objects | 13, 14 |
+| 16 | Power Management | 1 |
+| 17 | LittleFS Integration Test | 11, 12 |
+| 18 | Bluepad32 INI Config | 10 |
+| 19 | BLE Console (NUS) | 6, 10, 11 |
+| 20 | Android BLE Update App | 19, 12 |
+| 21 | CAN Bus Architecture | 1, 5 |

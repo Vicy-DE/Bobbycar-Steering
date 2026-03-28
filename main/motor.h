@@ -2,9 +2,10 @@
  * @file motor.h
  * @brief Bobbycar motor objects — four wheel drive.
  *
- * Defines the motor data structure and API for four independent
- * wheel motors (front-left, front-right, rear-left, rear-right)
- * with bobbycar-specific parameters.
+ * Defines a Motor C++ class for individual wheel motors
+ * and a MotorController that manages all four wheels
+ * (FL, FR, RL, RR).  Provides a C-linkage API for use
+ * from plain C translation units.
  */
 
 #pragma once
@@ -28,90 +29,157 @@
 #define HOVER_START_FRAME    0x7A7A
 #define HOVER_SEND_INTERVAL  20   /**< ms between commands. */
 
+#ifdef __cplusplus
+
 /**
- * @brief One motor / wheel state.
+ * @brief One motor / wheel object.
+ *
+ * Wraps per-wheel state and provides clamped getters and
+ * setters.  Construct via MotorController.
+ */
+class Motor {
+public:
+    Motor() = default;
+
+    /** @brief Get commanded torque. */
+    int  torque()     const { return torque_; }
+    /** @brief Get measured speed. */
+    int  speed()      const { return speed_meas_; }
+    /** @brief Get battery voltage (0.01 V). */
+    int16_t bat_voltage() const { return bat_v_; }
+    /** @brief Get board temperature (0.1 C). */
+    int16_t board_temp()  const { return board_t_; }
+    /** @brief Check if motor is enabled. */
+    bool enabled()    const { return enabled_; }
+    /** @brief Check if board comm is active. */
+    bool connected()  const { return connected_; }
+
+    /**
+     * @brief Set torque (clamped to ±THROTTLE_MAX).
+     * @param[in] t  Desired torque.
+     * @sideeffects Modifies internal torque value.
+     */
+    void set_torque(int t);
+
+    /**
+     * @brief Set measured speed.
+     * @param[in] s  Measured speed ticks.
+     * @sideeffects Modifies internal speed value.
+     */
+    void set_speed(int s) { speed_meas_ = s; }
+
+    /**
+     * @brief Set enable flag.
+     * @param[in] en  true to enable.
+     * @sideeffects Modifies enable flag, logs.
+     */
+    void set_enabled(bool en);
+
+    /**
+     * @brief Set connected flag.
+     * @param[in] c  true if board comm active.
+     * @sideeffects Modifies connected flag.
+     */
+    void set_connected(bool c) { connected_ = c; }
+
+private:
+    int      torque_     = 0;
+    int      speed_meas_ = 0;
+    int16_t  bat_v_      = 0;
+    int16_t  board_t_    = 0;
+    bool     enabled_    = false;
+    bool     connected_  = false;
+};
+
+/**
+ * @brief Manager for the four bobbycar wheel motors.
+ */
+class MotorController {
+public:
+    /** @brief Get singleton instance. */
+    static MotorController &instance();
+
+    /**
+     * @brief Initialise all motors to defaults.
+     * @sideeffects Resets motor objects, logs.
+     */
+    void init();
+
+    /**
+     * @brief Get motor by index.
+     * @param[in] idx  0..MOTOR_COUNT-1.
+     * @return Reference to the Motor object.
+     */
+    Motor       &get(int idx);
+    const Motor &get(int idx) const;
+
+    /**
+     * @brief Set torque on all four motors.
+     * @param[in] t  Array of MOTOR_COUNT values.
+     * @sideeffects Modifies all motor torques.
+     */
+    void set_all_torque(const int t[MOTOR_COUNT]);
+
+    /**
+     * @brief Average torque across all motors.
+     * @return Average throttle value.
+     */
+    int avg_throttle() const;
+
+    /**
+     * @brief Set uniform throttle on all motors.
+     * @param[in] t  Throttle value.
+     * @sideeffects Modifies all motor torques.
+     */
+    void set_throttle(int t);
+
+    /** @brief Human-readable name for motor index. */
+    static const char *name(int idx);
+
+private:
+    MotorController() = default;
+    Motor motors_[MOTOR_COUNT];
+};
+
+#endif /* __cplusplus */
+
+/* --------------------------------------------------------- */
+/*  C-linkage API (callable from .c files)                   */
+/* --------------------------------------------------------- */
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+void    motor_init(void);
+int     motor_get_torque(int idx);
+void    motor_set_torque(int idx, int torque);
+bool    motor_get_enabled(int idx);
+void    motor_set_enabled(int idx, bool en);
+void    motor_set_all_torque(const int t[MOTOR_COUNT]);
+int     motor_get_throttle(void);
+void    motor_set_throttle(int throttle);
+
+/**
+ * @brief Motor state snapshot for C callers.
  */
 typedef struct {
-    int      torque;       /**< Commanded: -1000..+1000. */
-    int      speed_meas;   /**< Measured speed (ticks).  */
-    int16_t  bat_voltage;  /**< Battery (0.01 V units).  */
-    int16_t  board_temp;   /**< Board temp (0.1 C).      */
-    bool     enabled;      /**< Motor enable flag.        */
-    bool     connected;    /**< Board comm active flag.   */
-} motor_t;
+    int      torque;
+    int      speed_meas;
+    int16_t  bat_voltage;
+    int16_t  board_temp;
+    bool     enabled;
+    bool     connected;
+} motor_state_t;
 
 /**
- * @brief Initialise all four motor objects to defaults.
- *
- * @sideeffects Zeros static motor array.
+ * @brief Get a snapshot of one motor's state.
+ * @param[in]  idx  Motor index.
+ * @param[out] out  Filled on success.
+ * @return true if idx valid.
  */
-void motor_init(void);
+bool motor_get_state(int idx, motor_state_t *out);
 
-/**
- * @brief Get pointer to a motor object.
- *
- * @param[in] idx  Motor index (MOTOR_FL .. MOTOR_RR).
- * @return Pointer to the motor struct, NULL on bad index.
- */
-motor_t *motor_get(int idx);
-
-/**
- * @brief Set torque for one motor (clamped).
- *
- * @param[in] idx     Motor index.
- * @param[in] torque  Value in -THROTTLE_MAX..+THROTTLE_MAX.
- *
- * @sideeffects Modifies static motor torque value.
- */
-void motor_set_torque(int idx, int torque);
-
-/**
- * @brief Get current torque for one motor.
- *
- * @param[in] idx  Motor index.
- * @return Torque value, 0 on bad index.
- */
-int motor_get_torque(int idx);
-
-/**
- * @brief Set enable flag for one motor.
- *
- * @param[in] idx  Motor index.
- * @param[in] en   true to enable, false to disable.
- *
- * @sideeffects Modifies static motor struct.
- */
-void motor_set_enabled(int idx, bool en);
-
-/**
- * @brief Check if a motor is enabled.
- *
- * @param[in] idx  Motor index.
- * @return true if enabled, false otherwise.
- */
-bool motor_get_enabled(int idx);
-
-/**
- * @brief Set torque for all four motors at once.
- *
- * @param[in] torque  Array of MOTOR_COUNT values.
- *
- * @sideeffects Modifies all static motor torques.
- */
-void motor_set_all_torque(const int torque[MOTOR_COUNT]);
-
-/**
- * @brief Get combined throttle value.
- *
- * @return Average of all four motor torques.
- */
-int motor_get_throttle(void);
-
-/**
- * @brief Set throttle for all motors uniformly.
- *
- * @param[in] throttle  Value in -THROTTLE_MAX..+THROTTLE_MAX.
- *
- * @sideeffects Modifies all motor torques.
- */
-void motor_set_throttle(int throttle);
+#ifdef __cplusplus
+}
+#endif

@@ -9,6 +9,7 @@
  */
 
 #include "console.h"
+#include "ble_console.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -121,7 +122,7 @@ bool console_exec(const char *line)
         }
     }
 
-    printf("Unknown command: %s\r\n", argv[0]);
+    console_printf("Unknown command: %s\r\n", argv[0]);
     return false;
 }
 

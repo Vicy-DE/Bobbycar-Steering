@@ -24,6 +24,7 @@
 #include "motor.h"
 #include "console.h"
 #include "console_cmds.h"
+#include "power_mgmt.h"
 
 #include <btstack_port_esp32.h>
 #include <btstack_run_loop.h>
@@ -323,7 +324,7 @@ void app_main(void)
     esp_chip_info_t chip_info;
     esp_chip_info(&chip_info);
 
-    ESP_LOGI(TAG, "Bobbycar-Steering v0.5");
+    ESP_LOGI(TAG, "Bobbycar-Steering v0.7");
 
 #if CONFIG_IDF_TARGET_ESP32C3
     ESP_LOGI(TAG, "Target: ESP32-C3 (RISC-V, 160 MHz, Wi-Fi + BLE 5)");
@@ -372,6 +373,9 @@ void app_main(void)
 
     /* ---- Initialize motor objects ---- */
     motor_init();
+
+    /* ---- Enable power management ---- */
+    power_mgmt_init();
 
     /* ---- Initialize console ---- */
     console_cmds_register();

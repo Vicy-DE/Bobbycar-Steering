@@ -15,6 +15,8 @@
 
 #include "esp_log.h"
 #include "storage.h"
+#include "bp32_config.h"
+#include "ble_console.h"
 
 static const char *TAG = "gamepad";
 
@@ -59,6 +61,12 @@ static void my_platform_init(int argc, const char **argv)
 static void my_platform_on_init_complete(void)
 {
     ESP_LOGI(TAG, "Bluepad32 init complete \xe2\x80\x94 scanning for gamepads");
+
+    /* Load Bluepad32 config (.ini files) from LittleFS. */
+    bp32_config_load();
+
+    /* Initialise BLE NUS console (coexists with Bluepad32). */
+    ble_console_init();
 
     /* Load known gamepads from LittleFS and log them. */
     storage_gamepad_entry_t known[STORAGE_MAX_GAMEPADS];
@@ -145,6 +153,9 @@ static uni_error_t my_platform_on_device_ready(uni_hid_device_t *d)
 
     /* Persist this gamepad in LittleFS. */
     storage_save_gamepad(d->conn.btaddr, d->name);
+
+    /* Add to Bluepad32 known device config. */
+    bp32_config_add_device(d->conn.btaddr, d->name);
 
     trigger_event_on_gamepad(d);
     return UNI_ERROR_SUCCESS;

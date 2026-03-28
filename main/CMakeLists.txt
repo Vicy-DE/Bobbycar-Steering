@@ -2,12 +2,16 @@ idf_component_register(
     SRCS "main.c"
          "my_platform.c"
          "storage.c"
-         "motor.c"
-         "steering_algo.c"
+         "motor.cpp"
+         "steering_algo.cpp"
          "console.c"
          "console_cmds.c"
          "console_cmds_fs.c"
          "xmodem.c"
+         "power_mgmt.c"
+         "ini_parser.c"
+         "bp32_config.c"
+         "ble_console.c"
     INCLUDE_DIRS "."
     PRIV_REQUIRES display
                   esp_adc

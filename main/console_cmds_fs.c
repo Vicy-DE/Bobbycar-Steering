@@ -10,6 +10,7 @@
 #include "console_cmds.h"
 #include "console.h"
 #include "xmodem.h"
+#include "ble_console.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -19,6 +20,10 @@
 #include <errno.h>
 #include "esp_log.h"
 #include "esp_littlefs.h"
+
+/* Redirect printf to console_printf so output is mirrored
+ * to both UART and BLE NUS when a client is connected. */
+#define printf console_printf
 
 static const char *TAG __attribute__((unused))
     = "fs_cmd";

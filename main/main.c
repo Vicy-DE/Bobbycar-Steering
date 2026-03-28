@@ -21,6 +21,9 @@
 #include "display.h"
 #include "pin_config.h"
 #include "storage.h"
+#include "motor.h"
+#include "console.h"
+#include "console_cmds.h"
 
 #include <btstack_port_esp32.h>
 #include <btstack_run_loop.h>
@@ -48,18 +51,11 @@ static lv_obj_t *s_bar_sensor1 = NULL;
 static lv_obj_t *s_bar_sensor2 = NULL;
 
 /**
- * @brief Cycle the onboard WS2812 RGB LED through R, G, B colors.
+ * @brief Cycle WS2812 RGB LED through R, G, B.
  *
- * The ESP32 SuperMini boards have an addressable WS2812 LED on
- * BLINKY_WS2812_GPIO.  This task initialises the led_strip RMT
- * driver and cycles through red, green, and blue at 500 ms intervals.
- * Additional free GPIOs in BLINKY_GPIO_PINS are toggled as plain
- * push-pull outputs for any external LEDs.
+ * @param[in] arg  Unused (pass NULL).
  *
- * @param[in] arg  Unused FreeRTOS task argument (pass NULL).
- *
- * @sideeffects Configures GPIO output registers and the RMT peripheral,
- *              drives the WS2812 data line and external LED GPIOs.
+ * @sideeffects Drives WS2812 and external GPIO LEDs.
  */
 static void blinky_task(void *arg)
 {
@@ -138,11 +134,9 @@ static void blinky_task(void *arg)
 }
 
 /**
- * @brief Initialize ADC1 with two oneshot channels.
- *
- * @return ESP_OK on success, or an error code.
- *
- * @sideeffects Configures ADC1 hardware for oneshot sampling.
+ * @brief Initialize ADC1 with two channels.
+ * @return ESP_OK on success.
+ * @sideeffects Configures ADC1 hardware.
  */
 static esp_err_t adc_init(void)
 {
@@ -180,10 +174,9 @@ static esp_err_t adc_init(void)
 }
 
 /**
- * @brief Read a raw ADC value from the specified channel.
- *
- * @param[in]  channel  ADC channel to read.
- * @param[out] raw      Pointer to store the raw 12-bit value.
+ * @brief Read a raw ADC value.
+ * @param[in]  channel  ADC channel.
+ * @param[out] raw      12-bit output.
  * @return ESP_OK on success.
  */
 static esp_err_t adc_read_channel(adc_channel_t channel, int *raw)
@@ -192,11 +185,7 @@ static esp_err_t adc_read_channel(adc_channel_t channel, int *raw)
 }
 
 /**
- * @brief Create the LVGL user interface.
- *
- * Builds a simple dashboard with a title, two sensor value labels,
- * and two progress bars showing the ADC readings.
- *
+ * @brief Create the LVGL dashboard UI.
  * @sideeffects Creates LVGL objects on the active screen.
  */
 static void ui_create(void)
@@ -278,12 +267,10 @@ static void ui_create(void)
 }
 
 /**
- * @brief Update the UI with new ADC readings.
- *
- * @param[in] raw1  Raw 12-bit ADC value for sensor 1.
- * @param[in] raw2  Raw 12-bit ADC value for sensor 2.
- *
- * @sideeffects Updates LVGL label text and bar values.
+ * @brief Update UI with new ADC readings.
+ * @param[in] raw1  Sensor 1 ADC value.
+ * @param[in] raw2  Sensor 2 ADC value.
+ * @sideeffects Updates LVGL widgets.
  */
 static void ui_update(int raw1, int raw2)
 {
@@ -299,15 +286,9 @@ static void ui_update(int raw1, int raw2)
 }
 
 /**
- * @brief Sensor and display update task.
- *
- * Runs in its own FreeRTOS task to read ADC sensors and update
- * the LVGL display while BTstack occupies the main task.
- *
- * @param[in] arg  Unused FreeRTOS task argument (pass NULL).
- *
- * @sideeffects Reads ADC channels, updates LVGL widget values,
- *              runs LVGL timer handler.
+ * @brief Sensor/display update task.
+ * @param[in] arg  Unused (pass NULL).
+ * @sideeffects Reads ADC, updates LVGL, runs timer.
  */
 static void sensor_display_task(void *arg)
 {
@@ -335,20 +316,14 @@ static void sensor_display_task(void *arg)
 
 /**
  * @brief Application entry point.
- *
- * Initializes peripherals (display, ADC, UI), starts FreeRTOS
- * tasks (blinky, sensor/display), then initializes Bluepad32
- * and enters the BTstack run loop (does not return).
- *
- * @sideeffects Initializes all system peripherals, creates LVGL UI,
- *              starts Bluetooth scanning, prints startup banner.
+ * @sideeffects Initializes all peripherals, starts tasks.
  */
 void app_main(void)
 {
     esp_chip_info_t chip_info;
     esp_chip_info(&chip_info);
 
-    ESP_LOGI(TAG, "Bobbycar-Steering v0.4");
+    ESP_LOGI(TAG, "Bobbycar-Steering v0.5");
 
 #if CONFIG_IDF_TARGET_ESP32C3
     ESP_LOGI(TAG, "Target: ESP32-C3 (RISC-V, 160 MHz, Wi-Fi + BLE 5)");
@@ -389,9 +364,19 @@ void app_main(void)
     /* ---- Initialize LittleFS storage ---- */
     ret = storage_init();
     if (ret != ESP_OK) {
-        ESP_LOGW(TAG, "Storage init failed: %s (continuing without persistence)",
-                 esp_err_to_name(ret));
+        ESP_LOGW(TAG,
+            "Storage init failed: %s"
+            " (continuing without persistence)",
+            esp_err_to_name(ret));
     }
+
+    /* ---- Initialize motor objects ---- */
+    motor_init();
+
+    /* ---- Initialize console ---- */
+    console_cmds_register();
+    console_cmds_fs_register();
+    console_init();
 
     /* ---- Start blinky task ---- */
     xTaskCreate(blinky_task, "blinky", 4096, NULL, 5, NULL);

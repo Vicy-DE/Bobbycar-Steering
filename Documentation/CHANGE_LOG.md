@@ -1,5 +1,41 @@
 # Change Log — Bobbycar-Steering
 
+## [2026-03-28] UART Console, Motor Objects, Ackermann Steering, XMODEM
+
+### What was changed
+- `main/motor.h` — Created motor struct and API for 4-wheel drive (FL, FR, RL, RR) with bobbycar parameters (THROTTLE_MAX=1000, HOVER_START_FRAME=0x7A7A)
+- `main/motor.c` — Created 4 motor instances with clamped torque set/get, per-motor enable, set-all-torque batch function
+- `main/steering_algo.h` — Created Ackermann steering geometry API with bobbycar dimensions (wheelbase=35 cm, width=30 cm)
+- `main/steering_algo.c` — Ported `calc_torque_per_wheel()` from bobbycar-project; Ackermann torque distribution with PID correction and per-wheel clamping
+- `main/console.h` — Created shell_cmd_t typedef (1180-style: name+desc+handler), console init/register/exec API
+- `main/console.c` — Created UART console task (FreeRTOS fgets loop, bobbycar exec dispatch pattern), 1180-format help command, command registration framework
+- `main/console_cmds.h` — Created registration function prototypes for motor/steering and filesystem command groups
+- `main/console_cmds.c` — Created 20 bobbycar-style commands: echo, ver, reset, sets/gets/getds (steering), sett/gett (throttle), getb (board), seti/geti (input source), setm/getm (mode), setkp/ki/kd/getkp/ki/kd/getpo (PID)
+- `main/xmodem.h` — Created XMODEM-CRC protocol API (SOH/STX, CRC-16 poly 0x1021, error codes)
+- `main/xmodem.c` — Created full XMODEM-CRC send/receive with 3s timeout, 10 retries, 128-byte and 1K block support
+- `main/console_cmds_fs.c` — Created 9 filesystem commands (ls, cd, pwd, rm, mkdir, show, recv, send, format) operating on LittleFS with XMODEM file transfer and path-traversal protection
+- `main/main.c` — Added motor_init(), console_cmds_register(), console_cmds_fs_register(), console_init() calls; version bumped to v0.5
+- `main/CMakeLists.txt` — Added 6 new source files: motor.c, steering_algo.c, console.c, console_cmds.c, console_cmds_fs.c, xmodem.c
+- `Documentation/Requirements/requirements.md` — Added requirements #11-14 (UART Console Shell, XMODEM File Transfer, Four-Wheel Motor Objects, Ackermann Steering Algorithm)
+- `Documentation/ToDo/console-motors-steering.md` — Created feature todo checklist
+
+### Why it was changed
+Feature addition: ports the console shell, motor control, and Ackermann steering algorithm from the bobbycar-project. Console uses the 1180-project help structure (name+description columns) with the bobbycar dispatch pattern. XMODEM-CRC enables file transfer over UART for firmware data and configuration files.
+
+### What it does / expected behaviour
+- UART console task starts on boot, prints `> ` prompt, accepts typed commands
+- `help` lists all 29 commands with 1180-style aligned descriptions
+- Motor commands (sets/sett) automatically run Ackermann torque distribution across 4 wheels
+- Steering angle + throttle → per-wheel torque via calc_torque_per_wheel()
+- XMODEM recv/send transfers files over serial to/from LittleFS
+- Filesystem commands (ls, cd, pwd, rm, mkdir, show, format) with ".." traversal protection
+- 4 motor objects initialised: FL, FR, RL, RR with torque clamping ±1000
+
+### Verified
+- Build: OK — ESP32-H2, binary 0x11f9b0 bytes (63% free in 3 MB partition)
+- Flash: OK — COM13, hash verified
+- Debug: OK — Serial monitor confirms: "Motor init: 4 motors (FL FR RL RR)", "Console ready (type 'help')", "Console task started", prompt displayed
+
 ## [2026-03-28] LittleFS Storage, Console Removal, Bluepad32 Fork Switch
 
 ### What was changed

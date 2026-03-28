@@ -1,6 +1,6 @@
 # Project Documentation — Bobbycar-Steering
 
-**Last updated:** 2026-03-28 (v0.4)
+**Last updated:** 2026-03-28 (v0.5)
 **IDF Target:** `esp32c3` / `esp32h2` / `esp32c5`
 **ESP-IDF Version:** v5.4.3
 
@@ -10,7 +10,7 @@
 
 Cross-platform steering controller firmware for the Bobbycar project. Targets ESP32 SuperMini development boards (ESP32-C3, ESP32-H2, ESP32-C5) with LVGL-based display output and PWM servo control. Built on ESP-IDF v5.4 with FreeRTOS.
 
-Current state: ADC sensor readout, ST7796S 3.5" SPI TFT display with LVGL dashboard UI, WS2812 RGB LED blinky, BLE gamepad input via Bluepad32, and LittleFS persistent config/gamepad storage.
+Current state: ADC sensor readout, ST7796S 3.5" SPI TFT display with LVGL dashboard UI, WS2812 RGB LED blinky, BLE gamepad input via Bluepad32, LittleFS persistent config/gamepad storage, UART console shell with 29 commands, XMODEM-CRC file transfer, 4-wheel motor objects, and Ackermann steering algorithm.
 
 **Hardware source:** [AliExpress — ESP32 SuperMini Dev Boards](https://de.aliexpress.com/item/1005009495310442.html)
 
@@ -59,10 +59,14 @@ ESP32 SuperMini form factor with:
 ├──────────────────────────────────────────┤
 │                main/                     │
 │         app_main() entry                 │
-│  ┌─────────────────┐  ┌───────────────┐  │
-│  │sensor_display_  │  │ BTstack loop  │  │
-│  │task (FreeRTOS)  │  │ (blocks main) │  │
-│  └─────────────────┘  └───────────────┘  │
+│  ┌─────────────┐ ┌──────────┐ ┌────────┐ │
+│  │sensor_displ │ │ BTstack  │ │console │ │
+│  │_task (RTOS) │ │  (block) │ │  task  │ │
+│  └─────────────┘ └──────────┘ └────────┘ │
+│  ┌─────────────┐ ┌──────────┐ ┌────────┐ │
+│  │  motor (4x) │ │ steering │ │ xmodem │ │
+│  │  FL/FR/RL/RR│ │ Ackerman │ │  CRC   │ │
+│  └─────────────┘ └──────────┘ └────────┘ │
 └──────────────────────────────────────────┘
 ```
 
@@ -70,9 +74,11 @@ ESP32 SuperMini form factor with:
 
 1. ESP-IDF bootloader loads application
 2. `app_main()` initialises peripherals (ADC, display, WS2812)
-3. FreeRTOS tasks created: `sensor_display_task`, `blinky_task`
-4. BTstack + Bluepad32 initialised; `btstack_run_loop_execute()` blocks `app_main` forever
-5. BLE scanning starts, gamepad events handled via callbacks
+3. Motor objects initialised (4 wheels: FL, FR, RL, RR)
+4. Console commands registered, UART console task started
+5. FreeRTOS tasks created: `sensor_display_task`, `blinky_task`
+6. BTstack + Bluepad32 initialised; `btstack_run_loop_execute()` blocks `app_main` forever
+7. BLE scanning starts, gamepad events handled via callbacks
 
 ---
 
@@ -86,6 +92,12 @@ ESP32 SuperMini form factor with:
 | `main/pin_config.h` | Per-target GPIO pin assignments (SPI display, I2C touch, TWAI, ADC, WS2812, blinky GPIOs) via `#if CONFIG_IDF_TARGET_*` guards |
 | `components/display/` | ST7796S 3.5" SPI TFT driver — SPI bus init, esp_lcd panel, LVGL v9 flush integration, backlight, landscape rotation |
 | `components/bluepad32/` | Bluepad32 v4.2.0 (git submodule) — BLE gamepad library with BTstack integration |
+| `main/motor.h` / `main/motor.c` | 4-wheel motor objects (FL, FR, RL, RR) — torque set/get, enable, batch set, clamped to ±1000 |
+| `main/steering_algo.h` / `main/steering_algo.c` | Ackermann steering algorithm — `calc_torque_per_wheel()` distributes throttle + steering angle to per-wheel torque |
+| `main/console.h` / `main/console.c` | UART console shell — FreeRTOS task, command dispatch (bobbycar pattern), 1180-style help, registration framework |
+| `main/console_cmds.h` / `main/console_cmds.c` | 20 motor/steering/PID/system commands — sets, gets, sett, gett, setkp/ki/kd, etc. |
+| `main/console_cmds_fs.c` | 9 filesystem commands — ls, cd, pwd, rm, mkdir, show, recv, send, format (LittleFS + XMODEM) |
+| `main/xmodem.h` / `main/xmodem.c` | XMODEM-CRC protocol — 128B/1K blocks, CRC-16 (poly 0x1021), 3s timeout, 10 retries |
 | `components/steering/` | Steering servo control — PWM output via LEDC peripheral (planned) |
 | `components/lvgl/` | LVGL v9.2 graphics library (git submodule) |
 
@@ -149,7 +161,7 @@ Target-specific code uses `#if CONFIG_IDF_TARGET_ESP32C3` / `ESP32H2` / `ESP32C5
 
 ## 8. Known Limitations / Open Issues
 
-- Steering component not yet implemented
+- Steering servo PWM output not yet implemented (Ackermann algorithm is ready, motor objects exist but no hardware driver yet)
 - Touch driver not yet implemented (I2C pins reserved)
 - ESP32-C5 support in ESP-IDF may be in preview status
 - ESP32-H2 has no Wi-Fi — connectivity limited to BLE and 802.15.4
@@ -167,6 +179,7 @@ Target-specific code uses `#if CONFIG_IDF_TARGET_ESP32C3` / `ESP32H2` / `ESP32C5
 
 | Date | Summary |
 |---|---|
+| 2026-03-28 | UART console shell (29 cmds), XMODEM-CRC, 4-wheel motor objects, Ackermann steering |
 | 2026-03-28 | LittleFS storage, console removal, Bluepad32 fork switch |
 | 2026-03-28 | Bluetooth gamepad support via Bluepad32 + BTstack (BLE scanning verified on ESP32-H2) |
 | 2026-03-28 | WS2812 RGB LED blinky fix (RMT driver) + GPIO blinky task |

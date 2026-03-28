@@ -1,6 +1,6 @@
 # Requirements — Bobbycar-Steering
 
-**Last updated:** 2026-03-27
+**Last updated:** 2026-03-28
 
 ---
 
@@ -116,6 +116,50 @@
 
 ---
 
+## 11. UART Console Shell — Interactive CLI
+
+| Item | Detail |
+|---|---|
+| **Module / Component** | main |
+| **Interface** | UART / USB-CDC |
+| **Platform** | All |
+| **Requirements** | <ul><li>FreeRTOS console task reads lines from stdin (USB-CDC) at 115200 baud</li><li>Command dispatch using 1180-style `shell_cmd_t` table: `{name, description, handler(argc, argv)}`</li><li>Software design follows bobbycar-project `command_interpreter.c` dispatch pattern</li><li>Help command prints aligned name + description for all registered commands (1180 format)</li><li>Commands: echo, ver, reset, sets, gets, getds, sett, gett, getb, seti, geti, setm, getm, setkp/ki/kd, getkp/ki/kd, getpo</li><li>File commands: ls, cd, pwd, rm, mkdir, show, recv, send, format</li><li>No file > 400 lines, no line > 100 characters</li></ul> |
+
+---
+
+## 12. XMODEM-CRC File Transfer — UART Binary Transfer
+
+| Item | Detail |
+|---|---|
+| **Module / Component** | main |
+| **Interface** | UART / USB-CDC |
+| **Platform** | All |
+| **Requirements** | <ul><li>XMODEM-CRC (polynomial 0x1021) protocol for file transfer over UART</li><li>Supports 128-byte (SOH) and 1024-byte (STX) packets</li><li>`recv <path>` receives a file via XMODEM-CRC and saves to LittleFS</li><li>`send <path>` reads a file from LittleFS and sends via XMODEM-CRC</li><li>8 KB transfer buffer, max file size limited by LittleFS partition (960 KB)</li><li>Timeout: 3 seconds per packet, max 10 retries</li></ul> |
+
+---
+
+## 13. Four-Wheel Motor Objects — Bobbycar Drive
+
+| Item | Detail |
+|---|---|
+| **Module / Component** | main |
+| **Interface** | N/A (data model) |
+| **Platform** | All |
+| **Requirements** | <ul><li>Four motor objects: front-left (FL), front-right (FR), rear-left (RL), rear-right (RR)</li><li>Each motor has: torque (-1000..+1000), speed_meas, bat_voltage, board_temp, enabled, connected</li><li>Hoverboard protocol constants: START_FRAME 0x7A7A, baud 57600</li><li>Throttle limits: THROTTLE_MAX=1000, THROTTLE_REVERSE_MAX=300</li><li>Bulk torque assignment and individual get/set operations</li></ul> |
+
+---
+
+## 14. Ackermann Steering Algorithm — Torque Distribution
+
+| Item | Detail |
+|---|---|
+| **Module / Component** | main |
+| **Interface** | N/A (algorithm) |
+| **Platform** | All |
+| **Requirements** | <ul><li>Port of bobbycar-project `calc_torque_per_wheel()` using Ackermann geometry</li><li>Chassis: wheelbase=35cm, width=30cm, steering_width=20cm, steering_to_wheel=5cm</li><li>Computes individual torque for each of 4 wheels based on steering angle</li><li>Inner wheels receive less torque, outer wheels more during turns</li><li>Normalized so total torque output equals the throttle input × 4</li><li>PID correction applied to front-axle differential (torque[0] += regulated, torque[1] -= regulated)</li><li>Output clamped to ±THROTTLE_MAX</li></ul> |
+
+---
+
 ## Traceability Matrix
 
 | Req # | Feature | Depends On |
@@ -130,3 +174,7 @@
 | 7 | ADC Analog Sensor Readout | 1, 5 |
 | 8 | 3.5" SPI TFT Display | 1, 2, 5, 7 |
 | 10 | Bluetooth Gamepad Support | 1, 6 |
+| 11 | UART Console Shell | 1, 4 |
+| 12 | XMODEM File Transfer | 11 |
+| 13 | Four-Wheel Motor Objects | 1 |
+| 14 | Ackermann Steering Algorithm | 13 |

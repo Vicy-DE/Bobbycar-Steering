@@ -15,6 +15,8 @@
 #include "esp_log.h"
 #include "esp_chip_info.h"
 #include "esp_adc/adc_oneshot.h"
+#include "driver/gpio.h"
+#include "led_strip.h"
 #include "lvgl.h"
 #include "display.h"
 #include "pin_config.h"
@@ -30,6 +32,96 @@ static lv_obj_t *s_label_sensor1 = NULL;
 static lv_obj_t *s_label_sensor2 = NULL;
 static lv_obj_t *s_bar_sensor1 = NULL;
 static lv_obj_t *s_bar_sensor2 = NULL;
+
+/**
+ * @brief Cycle the onboard WS2812 RGB LED through R, G, B colors.
+ *
+ * The ESP32 SuperMini boards have an addressable WS2812 LED on
+ * BLINKY_WS2812_GPIO.  This task initialises the led_strip RMT
+ * driver and cycles through red, green, and blue at 500 ms intervals.
+ * Additional free GPIOs in BLINKY_GPIO_PINS are toggled as plain
+ * push-pull outputs for any external LEDs.
+ *
+ * @param[in] arg  Unused FreeRTOS task argument (pass NULL).
+ *
+ * @sideeffects Configures GPIO output registers and the RMT peripheral,
+ *              drives the WS2812 data line and external LED GPIOs.
+ */
+static void blinky_task(void *arg)
+{
+    /* ---- WS2812 addressable RGB LED on BLINKY_WS2812_GPIO ---- */
+    led_strip_handle_t strip = NULL;
+    led_strip_config_t strip_cfg = {
+        .strip_gpio_num = BLINKY_WS2812_GPIO,
+        .max_leds       = 1,
+    };
+    led_strip_rmt_config_t rmt_cfg = {
+        .resolution_hz  = 10 * 1000 * 1000, /* 10 MHz */
+        .flags.with_dma = false,
+    };
+    ESP_ERROR_CHECK(led_strip_new_rmt_device(&strip_cfg, &rmt_cfg, &strip));
+    led_strip_clear(strip);
+
+    /* RGB colour table: Red → Green → Blue */
+    static const uint8_t k_colors[][3] = {
+        { 25,  0,  0 },   /* Red   */
+        {  0, 25,  0 },   /* Green */
+        {  0,  0, 25 },   /* Blue  */
+    };
+    const int color_count = sizeof(k_colors) / sizeof(k_colors[0]);
+
+#if BLINKY_GPIO_COUNT > 0
+    /* ---- Plain GPIO LEDs for external wiring ---- */
+    static const gpio_num_t k_gpios[] = BLINKY_GPIO_PINS;
+    for (int i = 0; i < BLINKY_GPIO_COUNT; ++i) {
+        gpio_config_t io_cfg = {
+            .intr_type    = GPIO_INTR_DISABLE,
+            .mode         = GPIO_MODE_OUTPUT,
+            .pin_bit_mask = (1ULL << k_gpios[i]),
+            .pull_down_en = GPIO_PULLDOWN_DISABLE,
+            .pull_up_en   = GPIO_PULLUP_DISABLE,
+        };
+        gpio_config(&io_cfg);
+        gpio_set_level(k_gpios[i], 0);
+    }
+#endif
+
+    ESP_LOGI(TAG, "blinky_task: WS2812 on GPIO%d, %d color(s), "
+             "%d ext GPIO(s)", BLINKY_WS2812_GPIO, color_count,
+             BLINKY_GPIO_COUNT);
+
+    int c_idx = 0;
+#if BLINKY_GPIO_COUNT > 0
+    int g_idx = 0;
+#endif
+    while (1) {
+        /* Set WS2812 colour */
+        led_strip_set_pixel(strip, 0,
+                            k_colors[c_idx][0],
+                            k_colors[c_idx][1],
+                            k_colors[c_idx][2]);
+        led_strip_refresh(strip);
+        ESP_LOGI(TAG, "blinky: WS2812 color %d (R=%d G=%d B=%d)",
+                 c_idx, k_colors[c_idx][0], k_colors[c_idx][1],
+                 k_colors[c_idx][2]);
+
+#if BLINKY_GPIO_COUNT > 0
+        /* Toggle current external GPIO LED ON */
+        gpio_set_level(k_gpios[g_idx], 1);
+        ESP_LOGI(TAG, "blinky: ext GPIO%d ON", (int)k_gpios[g_idx]);
+#endif
+
+        vTaskDelay(pdMS_TO_TICKS(500));
+
+#if BLINKY_GPIO_COUNT > 0
+        /* Turn off current external GPIO LED */
+        gpio_set_level(k_gpios[g_idx], 0);
+        g_idx = (g_idx + 1) % BLINKY_GPIO_COUNT;
+#endif
+
+        c_idx = (c_idx + 1) % color_count;
+    }
+}
 
 /**
  * @brief Initialize ADC1 with two oneshot channels.
@@ -243,6 +335,9 @@ void app_main(void)
 
     /* ---- Create UI ---- */
     ui_create();
+
+    /* ---- Start blinky task ---- */
+    xTaskCreate(blinky_task, "blinky", 4096, NULL, 5, NULL);
 
     ESP_LOGI(TAG, "System initialized. Entering main loop.");
 

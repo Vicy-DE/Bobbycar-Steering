@@ -92,12 +92,26 @@
 
 ---
 
+---
+
+## 9. Blinky LED Task — GPIO Output Test
+
+| Item | Detail |
+|---|---|
+| **Module / Component** | main |
+| **Interface** | GPIO |
+| **Platform** | All (ESP32-C3, ESP32-H2, ESP32-C5) |
+| **Requirements** | <ul><li>A FreeRTOS task (`blinky_task`) must cycle the onboard WS2812 addressable RGB LED through Red, Green, and Blue colors at 500 ms intervals using the `led_strip` RMT driver</li><li>The WS2812 LED GPIO is defined per-target as `BLINKY_WS2812_GPIO` (GPIO8 on all SuperMini boards)</li><li>Additional free GPIOs defined as `BLINKY_GPIO_PINS` / `BLINKY_GPIO_COUNT` are toggled as plain push-pull outputs for external LEDs</li><li>ESP32-H2 external LED GPIOs: GPIO4, GPIO5, GPIO9, GPIO14</li><li>ESP32-C3 external LED GPIO: GPIO21</li><li>ESP32-C5 external LED GPIOs: GPIO12, GPIO13, GPIO14, GPIO15</li><li>Managed component dependency: `espressif/led_strip ^2.4.1`</li><li>Task stack: 4096 bytes, priority 5</li><li>Primary purpose: hardware bring-up and RGB LED verification</li></ul> |
+
+---
+
 ## Traceability Matrix
 
 | Req # | Feature | Depends On |
 |---|---|---|
 | 1 | Cross-Platform ESP32 Support | — |
 | 2 | LVGL Display Support | 1 |
+| 9 | Blinky LED Task | 1 |
 | 3 | Steering Control | 1 |
 | 4 | USB-CDC Serial Interface | 1 |
 | 5 | Hardware Abstraction | 1 |

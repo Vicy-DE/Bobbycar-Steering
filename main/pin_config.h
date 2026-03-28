@@ -65,7 +65,10 @@
 #define ADC_SENSOR2_CHANNEL ADC_CHANNEL_1
 #define ADC_SENSOR_UNIT     ADC_UNIT_1
 
-/* Free: GPIO21 */
+/* Blinky — onboard WS2812 RGB LED + free GPIO outputs */
+#define BLINKY_WS2812_GPIO  8
+#define BLINKY_GPIO_PINS    { 21 }
+#define BLINKY_GPIO_COUNT   1
 
 #elif CONFIG_IDF_TARGET_ESP32H2
 /* ------- ESP32-H2 SuperMini ------- */
@@ -96,7 +99,10 @@
 #define ADC_SENSOR2_CHANNEL ADC_CHANNEL_1
 #define ADC_SENSOR_UNIT     ADC_UNIT_1
 
-/* Free: GPIO4, GPIO5, GPIO8, GPIO9, GPIO14 */
+/* Blinky — onboard WS2812 RGB LED + free GPIO outputs */
+#define BLINKY_WS2812_GPIO  8
+#define BLINKY_GPIO_PINS    { 4, 5, 9, 14 }
+#define BLINKY_GPIO_COUNT   4
 
 #elif CONFIG_IDF_TARGET_ESP32C5
 /* ------- ESP32-C5 SuperMini ------- */
@@ -125,7 +131,10 @@
 #define ADC_SENSOR2_CHANNEL ADC_CHANNEL_1
 #define ADC_SENSOR_UNIT     ADC_UNIT_1
 
-/* Free: GPIO12+ (many available) */
+/* Blinky — onboard WS2812 RGB LED + free GPIO outputs */
+#define BLINKY_WS2812_GPIO  8
+#define BLINKY_GPIO_PINS    { 12, 13, 14, 15 }
+#define BLINKY_GPIO_COUNT   4
 
 #else
 #error "Unsupported IDF target. Use esp32c3, esp32h2, or esp32c5."

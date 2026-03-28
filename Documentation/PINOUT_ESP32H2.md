@@ -41,7 +41,7 @@
 | **GPIO3** | Input | **TWAI RX (CAN)** | TWAI | Strapping pin, has ADC1_CH2 |
 | **GPIO4** | — | **Free** | ADC1_CH3 | Available (has ADC) |
 | **GPIO5** | — | **Free** | ADC1_CH4 | Available (has ADC) |
-| **GPIO8** | — | **Free** | — | Strapping pin |
+| **GPIO8** | Output | **Onboard WS2812 RGB LED** | RMT | Strapping pin; addressable LED via led_strip driver |
 | **GPIO9** | — | **Free** | — | Strapping pin |
 | **GPIO10** | Output | **SPI SCK (Display)** | SPI2 | ST7796S clock, 40 MHz |
 | **GPIO11** | Output | **SPI CS (Display)** | SPI2 | ST7796S chip select (active low) |
@@ -106,5 +106,5 @@
 2. **Strapping pins:** GPIO2, GPIO3, GPIO8, GPIO9, GPIO25. GPIO2/GPIO3 used for ADC/CAN — ensure no conflict during boot. Keep GPIO25 high during boot.
 3. **ADC GPIO offset:** ADC1_CH0 starts at GPIO1 (not GPIO0 like on ESP32-C3).
 4. **SiP flash variant:** GPIO6–7 are not available on boards with SiP flash. GPIO15–21 are used for SPI flash.
-5. **Free pins:** GPIO4, GPIO5, GPIO8, GPIO9, GPIO14 are available for expansion (5 free GPIOs).
+5. **Free pins:** GPIO4, GPIO5, GPIO9, GPIO14 are available for expansion (4 free GPIOs). GPIO8 is used by the onboard WS2812 RGB LED.
 6. **Lower clock speed:** ESP32-H2 runs at 96 MHz. Display refresh rate may be slightly lower than C3/C5.

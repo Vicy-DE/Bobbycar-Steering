@@ -4,7 +4,8 @@
  *
  * Implements the Bluepad32 platform callbacks for BLE gamepad
  * support.  Logs connection events and controller data (axes,
- * buttons) to the serial console.
+ * buttons) to the serial console.  Persists known gamepads
+ * and configs to LittleFS.
  */
 
 #include <string.h>
@@ -13,6 +14,7 @@
 #include <uni.h>
 
 #include "esp_log.h"
+#include "storage.h"
 
 static const char *TAG = "gamepad";
 
@@ -48,19 +50,30 @@ static void my_platform_init(int argc, const char **argv)
 /**
  * @brief Called when Bluepad32 initialization is complete.
  *
- * Starts BLE scanning and enables incoming gamepad connections.
+ * Loads known gamepads from LittleFS, starts BLE scanning,
+ * and enables incoming gamepad connections.
  *
- * @sideeffects Starts Bluetooth scanning via BTstack.
+ * @sideeffects Starts Bluetooth scanning via BTstack,
+ *              reads known gamepads from LittleFS.
  */
 static void my_platform_on_init_complete(void)
 {
-    ESP_LOGI(TAG, "Bluepad32 init complete — scanning for gamepads");
+    ESP_LOGI(TAG, "Bluepad32 init complete \xe2\x80\x94 scanning for gamepads");
+
+    /* Load known gamepads from LittleFS and log them. */
+    storage_gamepad_entry_t known[STORAGE_MAX_GAMEPADS];
+    int count = storage_load_gamepads(known, STORAGE_MAX_GAMEPADS);
+    ESP_LOGI(TAG, "Loaded %d known gamepad(s) from storage", count);
+    for (int i = 0; i < count; i++) {
+        ESP_LOGI(TAG, "  [%d] %02X:%02X:%02X:%02X:%02X:%02X  %s",
+                 i,
+                 known[i].addr[0], known[i].addr[1], known[i].addr[2],
+                 known[i].addr[3], known[i].addr[4], known[i].addr[5],
+                 known[i].name);
+    }
 
     uni_bt_start_scanning_and_autoconnect_unsafe();
     uni_bt_allow_incoming_connections(true);
-
-    /* Delete previously stored BT keys for clean pairing. */
-    uni_bt_del_keys_unsafe();
 }
 
 /**
@@ -114,19 +127,24 @@ static void my_platform_on_device_disconnected(uni_hid_device_t *d)
 /**
  * @brief Called when a device is ready to use.
  *
- * Assigns the gamepad to seat A and triggers a connection event
- * (rumble + LED feedback if supported).
+ * Assigns the gamepad to seat A, triggers a connection event
+ * (rumble + LED feedback if supported), and persists the
+ * gamepad in LittleFS storage.
  *
  * @param[in] d  Pointer to the HID device.
  * @return UNI_ERROR_SUCCESS on success.
  *
- * @sideeffects Sets gamepad seat, may trigger rumble and LED state.
+ * @sideeffects Sets gamepad seat, may trigger rumble and LED state,
+ *              writes to LittleFS.
  */
 static uni_error_t my_platform_on_device_ready(uni_hid_device_t *d)
 {
     ESP_LOGI(TAG, "Device ready: %p", d);
     my_platform_instance_t *ins = get_my_platform_instance(d);
     ins->gamepad_seat = GAMEPAD_SEAT_A;
+
+    /* Persist this gamepad in LittleFS. */
+    storage_save_gamepad(d->conn.btaddr, d->name);
 
     trigger_event_on_gamepad(d);
     return UNI_ERROR_SUCCESS;

@@ -1,6 +1,6 @@
 # Project Documentation — Bobbycar-Steering
 
-**Last updated:** 2026-03-28 (v0.3)
+**Last updated:** 2026-03-28 (v0.4)
 **IDF Target:** `esp32c3` / `esp32h2` / `esp32c5`
 **ESP-IDF Version:** v5.4.3
 
@@ -10,7 +10,7 @@
 
 Cross-platform steering controller firmware for the Bobbycar project. Targets ESP32 SuperMini development boards (ESP32-C3, ESP32-H2, ESP32-C5) with LVGL-based display output and PWM servo control. Built on ESP-IDF v5.4 with FreeRTOS.
 
-Current state: ADC sensor readout, ST7796S 3.5" SPI TFT display with LVGL dashboard UI, WS2812 RGB LED blinky, and BLE gamepad input via Bluepad32.
+Current state: ADC sensor readout, ST7796S 3.5" SPI TFT display with LVGL dashboard UI, WS2812 RGB LED blinky, BLE gamepad input via Bluepad32, and LittleFS persistent config/gamepad storage.
 
 **Hardware source:** [AliExpress — ESP32 SuperMini Dev Boards](https://de.aliexpress.com/item/1005009495310442.html)
 
@@ -81,7 +81,8 @@ ESP32 SuperMini form factor with:
 | Module / Component | Responsibility |
 |---|---|
 | `main/main.c` | Application entry point — peripheral init, FreeRTOS task creation, BTstack/Bluepad32 init, blocks on `btstack_run_loop_execute()` |
-| `main/my_platform.c` | Custom Bluepad32 platform "bobbycar" — gamepad discovery, connect/disconnect, controller data callbacks |
+| `main/my_platform.c` | Custom Bluepad32 platform "bobbycar" — gamepad discovery, connect/disconnect, controller data callbacks, LittleFS persistence |
+| `main/storage.h` / `main/storage.c` | LittleFS-based persistent storage — gamepad database (up to 8 entries), key=value config files |
 | `main/pin_config.h` | Per-target GPIO pin assignments (SPI display, I2C touch, TWAI, ADC, WS2812, blinky GPIOs) via `#if CONFIG_IDF_TARGET_*` guards |
 | `components/display/` | ST7796S 3.5" SPI TFT driver — SPI bus init, esp_lcd panel, LVGL v9 flush integration, backlight, landscape rotation |
 | `components/bluepad32/` | Bluepad32 v4.2.0 (git submodule) — BLE gamepad library with BTstack integration |
@@ -109,6 +110,7 @@ ESP-IDF CMake-based build system with `idf.py` frontend.
 - `sdkconfig.defaults.esp32c3` — C3-specific defaults (if needed)
 - `sdkconfig.defaults.esp32h2` — H2-specific defaults (if needed)
 - `sdkconfig.defaults.esp32c5` — C5-specific defaults (if needed)
+- `partitions.csv` — custom partition table: nvs + phy_init + factory (3 MB) + littlefs (960 KB)
 
 ---
 
@@ -165,6 +167,7 @@ Target-specific code uses `#if CONFIG_IDF_TARGET_ESP32C3` / `ESP32H2` / `ESP32C5
 
 | Date | Summary |
 |---|---|
+| 2026-03-28 | LittleFS storage, console removal, Bluepad32 fork switch |
 | 2026-03-28 | Bluetooth gamepad support via Bluepad32 + BTstack (BLE scanning verified on ESP32-H2) |
 | 2026-03-28 | WS2812 RGB LED blinky fix (RMT driver) + GPIO blinky task |
 | 2026-03-27 | ADC sensor readout + ST7796S display driver + LVGL dashboard UI + pinout docs |

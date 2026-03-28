@@ -31,6 +31,11 @@
 - [x] Flashed and verified on hardware (`idf.py flash monitor`)
 - [x] CHANGE_LOG.md updated
 - [x] PROJECT_DOC.md updated
+- [x] Switch submodule to Vicy-DE/bluepad32 fork
+- [x] Add LittleFS partition for persistent config/gamepad storage
+- [x] Remove Bluepad32 console (btstack_stdio_init removed)
+- [x] Save known gamepads to LittleFS on device_ready
+- [x] Load known gamepads from LittleFS on init_complete
 - [ ] Test with physical Xbox Wireless controller (BLE model)
 - [ ] Map gamepad axes/buttons to steering control output
 

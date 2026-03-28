@@ -1,5 +1,36 @@
 # Change Log — Bobbycar-Steering
 
+## [2026-03-28] LittleFS Storage, Console Removal, Bluepad32 Fork Switch
+
+### What was changed
+- `.gitmodules` — Changed Bluepad32 submodule URL from `ricardoquesada/bluepad32` to `Vicy-DE/bluepad32` fork
+- `.gitignore` — Added `build*/` pattern to ignore all numbered build directories (build2/, build3/, etc.)
+- `partitions.csv` — Created custom partition table: nvs (24 KB) + phy_init (4 KB) + factory (3 MB) + littlefs (960 KB) = 4 MB
+- `main/storage.h` — Created LittleFS storage API: gamepad database (save/load/remove) and key=value config persistence
+- `main/storage.c` — Created LittleFS implementation: VFS mount with auto-format, binary gamepad database with FIFO eviction, config files with path-traversal validation
+- `main/my_platform.c` — Added LittleFS storage integration: loads known gamepads on init (logs count + addresses), saves gamepads on device ready; removed `uni_bt_del_keys_unsafe()` for persistent pairing
+- `main/main.c` — Added `storage_init()` call before Bluepad32; removed `btstack_stdio_init()` and `#include <btstack_stdio_esp32.h>` (console removal); version bumped to v0.4
+- `main/CMakeLists.txt` — Added `storage.c` to SRCS, `joltwallet__littlefs` to PRIV_REQUIRES
+- `main/idf_component.yml` — Added `joltwallet/littlefs: "^1.20.4"` managed component dependency
+- `sdkconfig.defaults` — Switched from `CONFIG_PARTITION_TABLE_SINGLE_APP_LARGE` to `CONFIG_PARTITION_TABLE_CUSTOM` with `partitions.csv`; removed "console commands" comment from FreeRTOS stats
+
+### Why it was changed
+Feature addition: persistent storage for gamepad configs and known devices via LittleFS filesystem. Submodule switched to user's own fork for future customization. Bluepad32 console completely removed (was already disabled via Kconfig but stdio init still ran). Build directory gitignore expanded to cover numbered build dirs from multi-target workflows.
+
+### What it does / expected behaviour
+- LittleFS partition (960 KB) auto-formats on first boot, mounts at `/littlefs`
+- Known gamepads persist across reboots: address and name saved when a gamepad becomes ready
+- Gamepad database holds up to 8 entries with FIFO eviction when full
+- Config key=value files stored under `/littlefs/config/` with input validation
+- BT pairing keys persist (no longer deleted on every boot)
+- No console/stdio init — saves RAM, eliminates UART conflict risk
+- Binary size: 1.1 MB (63% free in 3 MB partition)
+
+### Verified
+- Build: OK — ESP32-H2, 1746/1746 targets, binary 0x119410 bytes
+- Flash: OK — COM13, hash verified
+- Debug: OK — Serial monitor confirms: "LittleFS mounted: total=983040 used=16384", "Loaded 0 known gamepad(s) from storage", "Bluepad32 init complete — scanning for gamepads", blinky cycling, no console crash
+
 ## [2026-03-28] Bluetooth Gamepad Support — Bluepad32 (BLE)
 
 ### What was changed

@@ -20,10 +20,10 @@
 #include "lvgl.h"
 #include "display.h"
 #include "pin_config.h"
+#include "storage.h"
 
 #include <btstack_port_esp32.h>
 #include <btstack_run_loop.h>
-#include <btstack_stdio_esp32.h>
 #include <uni.h>
 
 #include "sdkconfig.h"
@@ -348,7 +348,7 @@ void app_main(void)
     esp_chip_info_t chip_info;
     esp_chip_info(&chip_info);
 
-    ESP_LOGI(TAG, "Bobbycar-Steering v0.3");
+    ESP_LOGI(TAG, "Bobbycar-Steering v0.4");
 
 #if CONFIG_IDF_TARGET_ESP32C3
     ESP_LOGI(TAG, "Target: ESP32-C3 (RISC-V, 160 MHz, Wi-Fi + BLE 5)");
@@ -386,6 +386,13 @@ void app_main(void)
     /* ---- Create UI ---- */
     ui_create();
 
+    /* ---- Initialize LittleFS storage ---- */
+    ret = storage_init();
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "Storage init failed: %s (continuing without persistence)",
+                 esp_err_to_name(ret));
+    }
+
     /* ---- Start blinky task ---- */
     xTaskCreate(blinky_task, "blinky", 4096, NULL, 5, NULL);
 
@@ -395,12 +402,6 @@ void app_main(void)
     ESP_LOGI(TAG, "System initialized. Starting Bluepad32...");
 
     /* ---- Initialize Bluepad32 + BTstack ---- */
-#ifdef CONFIG_ESP_CONSOLE_UART
-#ifndef CONFIG_BLUEPAD32_USB_CONSOLE_ENABLE
-    btstack_stdio_init();
-#endif
-#endif
-
     btstack_init();
 
     uni_platform_set_custom(get_my_platform());

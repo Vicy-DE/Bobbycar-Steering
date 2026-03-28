@@ -105,6 +105,17 @@
 
 ---
 
+## 10. Bluetooth Gamepad Support — Bluepad32 (BLE)
+
+| Item | Detail |
+|---|---|
+| **Module / Component** | main |
+| **Interface** | BLE |
+| **Platform** | All (ESP32-C3, ESP32-H2, ESP32-C5) |
+| **Requirements** | <ul><li>Integrate Bluepad32 v4.2.0 library as a git submodule under `components/bluepad32/` for Bluetooth gamepad input</li><li>Use BTstack Bluetooth stack (bundled with Bluepad32) via the ESP32 VHCI controller interface</li><li>Support Xbox Wireless controllers: model 1914 (BLE native, firmware v5.15+), model 1708 (BLE since firmware v5.x), and Xbox Adaptive (BLE native)</li><li>ESP32-H2 / ESP32-C3 / ESP32-C5 are BLE-only — only BLE gamepads are supported (no BR/EDR / Bluetooth Classic)</li><li>Additional BLE gamepads supported: Steam Controller (with BT firmware), Stadia Controller (with BT firmware)</li><li>Custom Bluepad32 platform implementation providing callbacks: `on_device_connected`, `on_device_disconnected`, `on_device_ready`, `on_controller_data`</li><li>Gamepad data (axes, buttons) logged to serial console for verification</li><li>BTstack runs in the main task; existing sensor/display loop offloaded to a FreeRTOS task</li><li>Bluepad32 callbacks must NOT call expensive functions — use FreeRTOS queue to pass gamepad data to display task if needed</li></ul> |
+
+---
+
 ## Traceability Matrix
 
 | Req # | Feature | Depends On |
@@ -118,3 +129,4 @@
 | 6 | Wireless Connectivity | 1, 5 |
 | 7 | ADC Analog Sensor Readout | 1, 5 |
 | 8 | 3.5" SPI TFT Display | 1, 2, 5, 7 |
+| 10 | Bluetooth Gamepad Support | 1, 6 |

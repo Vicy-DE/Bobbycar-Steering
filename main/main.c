@@ -5,7 +5,7 @@
  * Cross-platform firmware for ESP32-H2, ESP32-C3, and ESP32-C5
  * SuperMini development boards. Reads two ADC analog sensor
  * channels and displays the values on a 3.5" ST7796S SPI TFT
- * using LVGL.
+ * using LVGL.  Supports BLE gamepad input via Bluepad32.
  */
 
 #include <stdio.h>
@@ -20,6 +20,20 @@
 #include "lvgl.h"
 #include "display.h"
 #include "pin_config.h"
+
+#include <btstack_port_esp32.h>
+#include <btstack_run_loop.h>
+#include <btstack_stdio_esp32.h>
+#include <uni.h>
+
+#include "sdkconfig.h"
+
+#ifndef CONFIG_BLUEPAD32_PLATFORM_CUSTOM
+#error "Kconfig: must set CONFIG_BLUEPAD32_PLATFORM_CUSTOM=y"
+#endif
+
+/* Defined in my_platform.c */
+struct uni_platform *get_my_platform(void);
 
 static const char *TAG = "main";
 
@@ -285,20 +299,56 @@ static void ui_update(int raw1, int raw2)
 }
 
 /**
+ * @brief Sensor and display update task.
+ *
+ * Runs in its own FreeRTOS task to read ADC sensors and update
+ * the LVGL display while BTstack occupies the main task.
+ *
+ * @param[in] arg  Unused FreeRTOS task argument (pass NULL).
+ *
+ * @sideeffects Reads ADC channels, updates LVGL widget values,
+ *              runs LVGL timer handler.
+ */
+static void sensor_display_task(void *arg)
+{
+    int adc_raw1 = 0;
+    int adc_raw2 = 0;
+    TickType_t last_adc_read = 0;
+
+    while (1) {
+        /* Read ADC at ~20 Hz */
+        TickType_t now = xTaskGetTickCount();
+        if ((now - last_adc_read) >= pdMS_TO_TICKS(50)) {
+            last_adc_read = now;
+
+            if (adc_read_channel(ADC_SENSOR1_CHANNEL, &adc_raw1) == ESP_OK &&
+                adc_read_channel(ADC_SENSOR2_CHANNEL, &adc_raw2) == ESP_OK) {
+                ui_update(adc_raw1, adc_raw2);
+            }
+        }
+
+        /* Run LVGL timer handler */
+        lv_timer_handler();
+        vTaskDelay(pdMS_TO_TICKS(5));
+    }
+}
+
+/**
  * @brief Application entry point.
  *
- * Initializes the display, ADC, and LVGL UI, then enters the
- * main loop reading sensors and updating the display.
+ * Initializes peripherals (display, ADC, UI), starts FreeRTOS
+ * tasks (blinky, sensor/display), then initializes Bluepad32
+ * and enters the BTstack run loop (does not return).
  *
  * @sideeffects Initializes all system peripherals, creates LVGL UI,
- *              prints startup banner to serial console.
+ *              starts Bluetooth scanning, prints startup banner.
  */
 void app_main(void)
 {
     esp_chip_info_t chip_info;
     esp_chip_info(&chip_info);
 
-    ESP_LOGI(TAG, "Bobbycar-Steering v0.2");
+    ESP_LOGI(TAG, "Bobbycar-Steering v0.3");
 
 #if CONFIG_IDF_TARGET_ESP32C3
     ESP_LOGI(TAG, "Target: ESP32-C3 (RISC-V, 160 MHz, Wi-Fi + BLE 5)");
@@ -339,27 +389,24 @@ void app_main(void)
     /* ---- Start blinky task ---- */
     xTaskCreate(blinky_task, "blinky", 4096, NULL, 5, NULL);
 
-    ESP_LOGI(TAG, "System initialized. Entering main loop.");
+    /* ---- Start sensor/display task ---- */
+    xTaskCreate(sensor_display_task, "sensor_disp", 4096, NULL, 5, NULL);
 
-    /* ---- Main loop: read ADC, update UI, run LVGL ---- */
-    int adc_raw1 = 0;
-    int adc_raw2 = 0;
-    TickType_t last_adc_read = 0;
+    ESP_LOGI(TAG, "System initialized. Starting Bluepad32...");
 
-    while (1) {
-        /* Read ADC at ~20 Hz */
-        TickType_t now = xTaskGetTickCount();
-        if ((now - last_adc_read) >= pdMS_TO_TICKS(50)) {
-            last_adc_read = now;
+    /* ---- Initialize Bluepad32 + BTstack ---- */
+#ifdef CONFIG_ESP_CONSOLE_UART
+#ifndef CONFIG_BLUEPAD32_USB_CONSOLE_ENABLE
+    btstack_stdio_init();
+#endif
+#endif
 
-            if (adc_read_channel(ADC_SENSOR1_CHANNEL, &adc_raw1) == ESP_OK &&
-                adc_read_channel(ADC_SENSOR2_CHANNEL, &adc_raw2) == ESP_OK) {
-                ui_update(adc_raw1, adc_raw2);
-            }
-        }
+    btstack_init();
 
-        /* Run LVGL timer handler */
-        lv_timer_handler();
-        vTaskDelay(pdMS_TO_TICKS(5));
-    }
+    uni_platform_set_custom(get_my_platform());
+
+    uni_init(0, NULL);
+
+    /* BTstack run loop — does NOT return. */
+    btstack_run_loop_execute();
 }

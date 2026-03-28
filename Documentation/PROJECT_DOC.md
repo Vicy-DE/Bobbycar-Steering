@@ -1,8 +1,8 @@
 # Project Documentation — Bobbycar-Steering
 
-**Last updated:** 2026-03-27 (v0.2)
+**Last updated:** 2026-03-28 (v0.3)
 **IDF Target:** `esp32c3` / `esp32h2` / `esp32c5`
-**ESP-IDF Version:** v5.4
+**ESP-IDF Version:** v5.4.3
 
 ---
 
@@ -10,7 +10,7 @@
 
 Cross-platform steering controller firmware for the Bobbycar project. Targets ESP32 SuperMini development boards (ESP32-C3, ESP32-H2, ESP32-C5) with LVGL-based display output and PWM servo control. Built on ESP-IDF v5.4 with FreeRTOS.
 
-Current state: ADC sensor readout and ST7796S 3.5" SPI TFT display with LVGL dashboard UI.
+Current state: ADC sensor readout, ST7796S 3.5" SPI TFT display with LVGL dashboard UI, WS2812 RGB LED blinky, and BLE gamepad input via Bluepad32.
 
 **Hardware source:** [AliExpress — ESP32 SuperMini Dev Boards](https://de.aliexpress.com/item/1005009495310442.html)
 
@@ -45,30 +45,34 @@ ESP32 SuperMini form factor with:
 ## 3. Software Architecture
 
 ```
-┌────────────────────────────────────┐
-│          ESP-IDF v5.4              │
-│  ┌──────────┐  ┌─────────────┐    │
-│  │ FreeRTOS │  │  Wi-Fi/BLE  │    │
-│  └──────────┘  └─────────────┘    │
-├────────────────────────────────────┤
-│           Components               │
-│  ┌──────────┐  ┌─────────────┐    │
-│  │ steering │  │   display   │    │
-│  │  (PWM)   │  │ (LVGL+drv) │    │
-│  └──────────┘  └─────────────┘    │
-├────────────────────────────────────┤
-│              main/                 │
-│         app_main() entry           │
-│   ADC readout + LVGL UI loop       │
-└────────────────────────────────────┘
+┌──────────────────────────────────────────┐
+│            ESP-IDF v5.4.3                │
+│  ┌──────────┐  ┌──────────┐  ┌────────┐ │
+│  │ FreeRTOS │  │ BLE 5    │  │ VHCI   │ │
+│  └──────────┘  └──────────┘  └────────┘ │
+├──────────────────────────────────────────┤
+│              Components                  │
+│  ┌──────────┐  ┌──────────┐  ┌────────┐ │
+│  │ steering │  │ display  │  │bluepad │ │
+│  │  (PWM)   │  │(LVGL+drv)│  │+btstack│ │
+│  └──────────┘  └──────────┘  └────────┘ │
+├──────────────────────────────────────────┤
+│                main/                     │
+│         app_main() entry                 │
+│  ┌─────────────────┐  ┌───────────────┐  │
+│  │sensor_display_  │  │ BTstack loop  │  │
+│  │task (FreeRTOS)  │  │ (blocks main) │  │
+│  └─────────────────┘  └───────────────┘  │
+└──────────────────────────────────────────┘
 ```
 
 ### Boot Flow
 
 1. ESP-IDF bootloader loads application
-2. `app_main()` initialises peripherals
-3. FreeRTOS tasks created for steering control and display
-4. Main loop runs via FreeRTOS scheduler
+2. `app_main()` initialises peripherals (ADC, display, WS2812)
+3. FreeRTOS tasks created: `sensor_display_task`, `blinky_task`
+4. BTstack + Bluepad32 initialised; `btstack_run_loop_execute()` blocks `app_main` forever
+5. BLE scanning starts, gamepad events handled via callbacks
 
 ---
 
@@ -76,9 +80,11 @@ ESP32 SuperMini form factor with:
 
 | Module / Component | Responsibility |
 |---|---|
-| `main/main.c` | Application entry point — ADC init, display init, LVGL UI creation, main loop (ADC read + UI update + LVGL timer) |
-| `main/pin_config.h` | Per-target GPIO pin assignments (SPI display, I2C touch, TWAI, ADC) via `#if CONFIG_IDF_TARGET_*` guards |
+| `main/main.c` | Application entry point — peripheral init, FreeRTOS task creation, BTstack/Bluepad32 init, blocks on `btstack_run_loop_execute()` |
+| `main/my_platform.c` | Custom Bluepad32 platform "bobbycar" — gamepad discovery, connect/disconnect, controller data callbacks |
+| `main/pin_config.h` | Per-target GPIO pin assignments (SPI display, I2C touch, TWAI, ADC, WS2812, blinky GPIOs) via `#if CONFIG_IDF_TARGET_*` guards |
 | `components/display/` | ST7796S 3.5" SPI TFT driver — SPI bus init, esp_lcd panel, LVGL v9 flush integration, backlight, landscape rotation |
+| `components/bluepad32/` | Bluepad32 v4.2.0 (git submodule) — BLE gamepad library with BTstack integration |
 | `components/steering/` | Steering servo control — PWM output via LEDC peripheral (planned) |
 | `components/lvgl/` | LVGL v9.2 graphics library (git submodule) |
 
@@ -147,6 +153,11 @@ Target-specific code uses `#if CONFIG_IDF_TARGET_ESP32C3` / `ESP32H2` / `ESP32C5
 - ESP32-H2 has no Wi-Fi — connectivity limited to BLE and 802.15.4
 - Display colours may require MADCTL tuning per physical display revision
 - ADC readings are raw 12-bit values — no calibration or voltage conversion applied yet
+- Bluepad32 "Controller lib version mismatch!" warning on ESP32-H2 (non-fatal, ESP-IDF v5.4.3 controller vs BTstack expectation)
+- HCI_Set_Event_Filter (opcode 0x0c05) fails on ESP32-H2 — expected, BR/EDR-only command on BLE-only SoC
+- ESP32-H2 requires `CONFIG_BT_LE_MSYS_BUF_FROM_HEAP=1` injected via CMake (Kconfig does not expose it)
+- BTstack `integrate_btstack.py` output is gitignored — must re-run after fresh clone (see setup.ps1)
+- Gamepad support not yet tested with physical Xbox controller
 
 ---
 
@@ -154,5 +165,7 @@ Target-specific code uses `#if CONFIG_IDF_TARGET_ESP32C3` / `ESP32H2` / `ESP32C5
 
 | Date | Summary |
 |---|---|
+| 2026-03-28 | Bluetooth gamepad support via Bluepad32 + BTstack (BLE scanning verified on ESP32-H2) |
+| 2026-03-28 | WS2812 RGB LED blinky fix (RMT driver) + GPIO blinky task |
 | 2026-03-27 | ADC sensor readout + ST7796S display driver + LVGL dashboard UI + pinout docs |
 | 2026-03-27 | Initial project setup — ESP-IDF + LVGL submodules, cross-platform structure, requirements |

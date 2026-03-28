@@ -1,5 +1,40 @@
 # Change Log — Bobbycar-Steering
 
+## [2026-03-28] Bluetooth Gamepad Support — Bluepad32 (BLE)
+
+### What was changed
+- `components/bluepad32/` — Added Bluepad32 v4.2.0 as git submodule; integrated BTstack via `integrate_btstack.py`
+- `CMakeLists.txt` — Added Bluepad32 + BTstack component directories (`EXTRA_COMPONENT_DIRS`), `-Wno-format` for third-party code, and `CONFIG_BT_LE_MSYS_BUF_FROM_HEAP=1` compile definition for `__idf_bt` on ESP32-H2
+- `main/main.c` — Added BTstack/Bluepad32 includes, moved sensor/display loop to `sensor_display_task()` FreeRTOS task, `app_main` now initializes peripherals then starts BTstack (`btstack_run_loop_execute()` blocks), version bumped to v0.3
+- `main/my_platform.c` — Created custom Bluepad32 platform "bobbycar" with callbacks: init, device discovered (filters keyboards), connected/disconnected, ready (assigns GAMEPAD_SEAT_A, triggers rumble), controller data (logs axes/buttons)
+- `main/CMakeLists.txt` — Added `bluepad32` and `btstack` to `PRIV_REQUIRES`, added `my_platform.c` to `SRCS`
+- `sdkconfig.defaults` — Added BLE controller settings (`CONFIG_BT_ENABLED`, `CONFIG_BT_CONTROLLER_ONLY`), Bluepad32 settings (`CONFIG_BLUEPAD32_PLATFORM_CUSTOM`, `CONFIG_BLUEPAD32_MAX_DEVICES=4`, `CONFIG_BLUEPAD32_USB_CONSOLE_ENABLE=n`), BTstack (`CONFIG_BTSTACK_AUDIO=n`), partition table (`CONFIG_PARTITION_TABLE_SINGLE_APP_LARGE`), FreeRTOS stats
+- `sdkconfig` — Updated to match sdkconfig.defaults (Bluepad32 console disabled, BT enabled, partition table enlarged)
+- `Documentation/Requirements/requirements.md` — Added Req #10 (Bluetooth Gamepad Support)
+- `Documentation/ToDo/bluetooth-gamepad.md` — Created feature todo checklist
+
+### Why it was changed
+Feature addition: Bluetooth gamepad support via Bluepad32 library with BTstack BLE stack. Enables Xbox Wireless controller (BLE models) input for the Bobbycar steering controller. ESP32-H2 supports BLE 5 only (no Bluetooth Classic), so only BLE-capable gamepads are supported.
+
+### What it does / expected behaviour
+- BTstack initializes BLE controller, registers VHCI transport (synchronous mode on ESP32-H2)
+- Bluepad32 starts scanning for BLE gamepads on boot
+- Custom platform "bobbycar" filters out keyboards, accepts gamepads
+- On gamepad connect: assigns GAMEPAD_SEAT_A, triggers 150 ms rumble feedback
+- Controller data callback logs axes (X/Y/RX/RY) and button bitmask
+- Sensor/display loop continues independently in its own FreeRTOS task
+- WS2812 blinky task continues cycling R→G→B alongside BLE scanning
+
+### Bugs fixed during integration
+- **UART console crash:** Bluepad32's `uni_console_init()` clashed with existing UART — fixed with `CONFIG_BLUEPAD32_USB_CONSOLE_ENABLE=n`
+- **msys_init failed -4:** ESP32-H2 Kconfig lacks `CONFIG_BT_LE_MSYS_BUF_FROM_HEAP` — injected via CMake `target_compile_definitions`
+- **BTstack HCI stuck:** ESP32-H2 requires synchronous VHCI mode (not async like ESP32/C3/S3) — confirmed original btstack_port_esp32.c code was correct
+
+### Verified
+- Build: OK — ESP32-H2, binary ~1.13 MB (27% free in 1.5 MB partition)
+- Flash: OK — COM13, hash verified
+- Debug: OK — Serial monitor confirmed: "Bluepad32 init complete — scanning for gamepads", BLE MAC 10:51:db:60:af:04, blinky continues cycling. Known non-fatal warnings: "Controller lib version mismatch!" (ESP-IDF v5.4.3 vs BTstack), "Failed command: opcode 0x0c05" (HCI_Set_Event_Filter is BR/EDR-only, expected to fail on BLE-only H2).
+
 ## [2026-03-28] Fix Blinky — WS2812 Addressable RGB LED via RMT
 
 ### What was changed

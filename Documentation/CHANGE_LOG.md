@@ -1,5 +1,32 @@
 # Change Log — Bobbycar-Steering
 
+## [2026-03-30] ILI9488 Display Port + XPT2046 Touch Input
+
+### What was changed
+- `main/pin_config.h` — Replaced ST7796S pin definitions with ILI9488; added `PIN_DISPLAY_MISO`, `PIN_TOUCH_CS`, `PIN_TOUCH_IRQ` for all 3 targets (H2/C3/C5); removed unused `LVGL_BUF_LINES`/`LVGL_BUF_SIZE` defines; reassigned blinky GPIOs
+- `components/display/display.c` — Major rewrite: ILI9488 18-bit RGB666 mode via `bits_per_pixel=18`; added RGB565→RGB666 conversion in flush callback; added XPT2046 SPI touch driver (4-sample averaging, calibrated coordinate mapping); reduced `LVGL_BUF_LINES` to 6; added `touch_init()`, `touch_get_indev()`, `touch_get_last_point()`
+- `components/display/include/display.h` — Updated `display_init()` signature with `miso_pin` parameter; added `touch_init()`, `touch_get_indev()`, `touch_get_last_point()` declarations
+- `main/main.c` — Updated `display_init()` call with `PIN_DISPLAY_MISO`; added `touch_init()` call; added touch coordinates label (`s_label_touch`); added demo button with press counter (`btn_event_cb`)
+- `sdkconfig.defaults` — Added `CONFIG_LV_USE_BUTTON=y`
+- `Documentation/connection.md` — Created wiring guide with ASCII art diagrams for ILI9488 module → ESP32-H2 SuperMini
+- `Documentation/PINOUT_ESP32H2.md` — Updated GPIO4/5/9/10/11/12/13/14/22 assignments; replaced I2C0 touch section with SPI2 shared bus (display+touch); added shared SPI bus note
+
+### Why it was changed
+Hardware change: porting from ST7796S 3.5" display to ILI9488 4.0" 480×320 SPI TFT with XPT2046 resistive touch controller. The ILI9488 requires 18-bit RGB666 over SPI (not 16-bit RGB565), requiring a conversion buffer in the flush callback. Touch input enables interactive UI elements.
+
+### What it does / expected behaviour
+- ILI9488 display initializes in 18-bit RGB666 mode (landscape 480×320)
+- XPT2046 resistive touch controller shares SPI2 bus with display (separate CS)
+- LVGL renders RGB565 internally; flush callback converts to RGB666 (3 bytes/pixel) before DMA transfer
+- Touch coordinates displayed on screen; demo button increments press counter on touch
+- Memory budget: 2×5,760 (LVGL bufs) + 8,640 (conv buf) = 20,160 bytes total display memory
+- Boot heap: 73,904 bytes — ample for BLE controller
+
+### Verified
+- Build: OK — ESP32-H2, `idf.py build` (1756/1756)
+- Flash: OK — COM14, hash verified
+- Debug: OK — Serial output confirms: "ILI9488 display (480x320)", "6-line bufs, 18-bit RGB666", "XPT2046 touch (CS=12, IRQ=13)", BLE running, 73.9 KB free heap
+
 ## [2026-03-29] Power Management, BLE Console, INI Config, C++ Conversion, LVGL Buffer Fix
 
 ### What was changed

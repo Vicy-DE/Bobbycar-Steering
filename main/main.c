@@ -4,8 +4,9 @@
  *
  * Cross-platform firmware for ESP32-H2, ESP32-C3, and ESP32-C5
  * SuperMini development boards. Reads two ADC analog sensor
- * channels and displays the values on a 3.5" ST7796S SPI TFT
- * using LVGL.  Supports BLE gamepad input via Bluepad32.
+ * channels and displays the values on a 4.0" ILI9488 SPI TFT
+ * using LVGL with XPT2046 resistive touch input.
+ * Supports BLE gamepad input via Bluepad32.
  */
 
 #include <stdio.h>
@@ -50,6 +51,9 @@ static lv_obj_t *s_label_sensor1 = NULL;
 static lv_obj_t *s_label_sensor2 = NULL;
 static lv_obj_t *s_bar_sensor1 = NULL;
 static lv_obj_t *s_bar_sensor2 = NULL;
+static lv_obj_t *s_label_touch = NULL;
+static lv_obj_t *s_btn_label = NULL;
+static uint32_t s_press_count = 0;
 
 /**
  * @brief Cycle WS2812 RGB LED through R, G, B.
@@ -186,6 +190,21 @@ static esp_err_t adc_read_channel(adc_channel_t channel, int *raw)
 }
 
 /**
+ * @brief Button press event callback for touch demo.
+ *
+ * @sideeffects Updates button label text.
+ */
+static void btn_event_cb(lv_event_t *e)
+{
+    (void)e;
+    s_press_count++;
+    char buf[32];
+    snprintf(buf, sizeof(buf), "Pressed: %lu",
+             (unsigned long)s_press_count);
+    lv_label_set_text(s_btn_label, buf);
+}
+
+/**
  * @brief Create the LVGL dashboard UI.
  * @sideeffects Creates LVGL objects on the active screen.
  */
@@ -218,11 +237,28 @@ static void ui_create(void)
                                 LV_PART_MAIN);
     lv_obj_align(label_target, LV_ALIGN_TOP_MID, 0, 50);
 
+    /* ---- Touch coordinates ---- */
+    s_label_touch = lv_label_create(scr);
+    lv_label_set_text(s_label_touch, "Touch: ----, ----");
+    lv_obj_set_style_text_color(s_label_touch, lv_color_hex(0x16c79a),
+                                LV_PART_MAIN);
+    lv_obj_align(s_label_touch, LV_ALIGN_TOP_MID, 0, 75);
+
+    /* ---- Demo button ---- */
+    lv_obj_t *btn = lv_button_create(scr);
+    lv_obj_set_size(btn, 200, 50);
+    lv_obj_align(btn, LV_ALIGN_CENTER, 0, -20);
+    lv_obj_add_event_cb(btn, btn_event_cb, LV_EVENT_CLICKED, NULL);
+
+    s_btn_label = lv_label_create(btn);
+    lv_label_set_text(s_btn_label, "Touch Me!");
+    lv_obj_center(s_btn_label);
+
     /* ---- Sensor 1 ---- */
     lv_obj_t *lbl1 = lv_label_create(scr);
     lv_label_set_text(lbl1, "Sensor 1");
     lv_obj_set_style_text_color(lbl1, lv_color_hex(0x0f3460), LV_PART_MAIN);
-    lv_obj_align(lbl1, LV_ALIGN_LEFT_MID, 20, -50);
+    lv_obj_align(lbl1, LV_ALIGN_LEFT_MID, 20, 40);
 
     s_label_sensor1 = lv_label_create(scr);
     lv_label_set_text(s_label_sensor1, "----");
@@ -230,7 +266,7 @@ static void ui_create(void)
                                 LV_PART_MAIN);
     lv_obj_set_style_text_font(s_label_sensor1, &lv_font_montserrat_24,
                                LV_PART_MAIN);
-    lv_obj_align(s_label_sensor1, LV_ALIGN_LEFT_MID, 120, -50);
+    lv_obj_align(s_label_sensor1, LV_ALIGN_LEFT_MID, 120, 40);
 
     s_bar_sensor1 = lv_bar_create(scr);
     lv_obj_set_size(s_bar_sensor1, 300, 20);
@@ -240,13 +276,13 @@ static void ui_create(void)
                               LV_PART_MAIN);
     lv_obj_set_style_bg_color(s_bar_sensor1, lv_color_hex(0x16c79a),
                               LV_PART_INDICATOR);
-    lv_obj_align(s_bar_sensor1, LV_ALIGN_LEFT_MID, 120, -25);
+    lv_obj_align(s_bar_sensor1, LV_ALIGN_LEFT_MID, 120, 65);
 
     /* ---- Sensor 2 ---- */
     lv_obj_t *lbl2 = lv_label_create(scr);
     lv_label_set_text(lbl2, "Sensor 2");
     lv_obj_set_style_text_color(lbl2, lv_color_hex(0x0f3460), LV_PART_MAIN);
-    lv_obj_align(lbl2, LV_ALIGN_LEFT_MID, 20, 30);
+    lv_obj_align(lbl2, LV_ALIGN_LEFT_MID, 20, 100);
 
     s_label_sensor2 = lv_label_create(scr);
     lv_label_set_text(s_label_sensor2, "----");
@@ -254,7 +290,7 @@ static void ui_create(void)
                                 LV_PART_MAIN);
     lv_obj_set_style_text_font(s_label_sensor2, &lv_font_montserrat_24,
                                LV_PART_MAIN);
-    lv_obj_align(s_label_sensor2, LV_ALIGN_LEFT_MID, 120, 30);
+    lv_obj_align(s_label_sensor2, LV_ALIGN_LEFT_MID, 120, 100);
 
     s_bar_sensor2 = lv_bar_create(scr);
     lv_obj_set_size(s_bar_sensor2, 300, 20);
@@ -264,18 +300,18 @@ static void ui_create(void)
                               LV_PART_MAIN);
     lv_obj_set_style_bg_color(s_bar_sensor2, lv_color_hex(0xe94560),
                               LV_PART_INDICATOR);
-    lv_obj_align(s_bar_sensor2, LV_ALIGN_LEFT_MID, 120, 55);
+    lv_obj_align(s_bar_sensor2, LV_ALIGN_LEFT_MID, 120, 125);
 }
 
 /**
- * @brief Update UI with new ADC readings.
+ * @brief Update UI with new ADC readings and touch state.
  * @param[in] raw1  Sensor 1 ADC value.
  * @param[in] raw2  Sensor 2 ADC value.
  * @sideeffects Updates LVGL widgets.
  */
 static void ui_update(int raw1, int raw2)
 {
-    char buf[16];
+    char buf[32];
 
     snprintf(buf, sizeof(buf), "%d", raw1);
     lv_label_set_text(s_label_sensor1, buf);
@@ -284,6 +320,15 @@ static void ui_update(int raw1, int raw2)
     snprintf(buf, sizeof(buf), "%d", raw2);
     lv_label_set_text(s_label_sensor2, buf);
     lv_bar_set_value(s_bar_sensor2, raw2, LV_ANIM_ON);
+
+    /* Update touch coordinates */
+    int tx, ty;
+    if (touch_get_last_point(&tx, &ty)) {
+        snprintf(buf, sizeof(buf), "Touch: %d, %d", tx, ty);
+    } else {
+        snprintf(buf, sizeof(buf), "Touch: ----, ----");
+    }
+    lv_label_set_text(s_label_touch, buf);
 }
 
 /**
@@ -343,13 +388,22 @@ void app_main(void)
 
     /* ---- Initialize display ---- */
     esp_err_t ret = display_init(
-        PIN_DISPLAY_MOSI, PIN_DISPLAY_SCLK, PIN_DISPLAY_CS,
-        PIN_DISPLAY_DC, PIN_DISPLAY_RST, PIN_DISPLAY_BL,
+        PIN_DISPLAY_MOSI, PIN_DISPLAY_MISO, PIN_DISPLAY_SCLK,
+        PIN_DISPLAY_CS, PIN_DISPLAY_DC, PIN_DISPLAY_RST,
+        PIN_DISPLAY_BL,
         DISPLAY_H_RES, DISPLAY_V_RES,
         DISPLAY_SPI_HOST, DISPLAY_SPI_FREQ_HZ);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Display init failed: %s", esp_err_to_name(ret));
         return;
+    }
+
+    /* ---- Initialize touch ---- */
+    ret = touch_init(DISPLAY_SPI_HOST, PIN_TOUCH_CS, PIN_TOUCH_IRQ,
+                     DISPLAY_H_RES, DISPLAY_V_RES);
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "Touch init failed: %s (continuing without touch)",
+                 esp_err_to_name(ret));
     }
 
     /* ---- Initialize ADC ---- */

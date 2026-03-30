@@ -2,8 +2,9 @@
  * @file pin_config.h
  * @brief Per-target GPIO pin assignments for Bobbycar-Steering.
  *
- * Defines pin mappings for SPI display (ST7796S), I2C touch,
- * TWAI (CAN), and ADC analog sensors across all three ESP32 targets.
+ * Defines pin mappings for SPI display (ILI9488), SPI touch
+ * (XPT2046), TWAI (CAN), and ADC analog sensors across all
+ * three ESP32 targets.
  *
  * @see Documentation/PINOUT_ESP32C3.md
  * @see Documentation/PINOUT_ESP32H2.md
@@ -17,20 +18,14 @@
 #include "esp_adc/adc_oneshot.h"
 
 /* ------------------------------------------------------------------ */
-/*  Display — ST7796S 3.5" SPI TFT (320x480, landscape 480x320)      */
+/*  Display — ILI9488 4.0" SPI TFT (320x480, landscape 480x320)      */
+/*  Touch  — XPT2046 resistive (shared SPI bus, separate CS)          */
 /* ------------------------------------------------------------------ */
 
 #define DISPLAY_H_RES       480
 #define DISPLAY_V_RES       320
 #define DISPLAY_SPI_HOST    SPI2_HOST
 #define DISPLAY_SPI_FREQ_HZ (40 * 1000 * 1000)
-
-/* ------------------------------------------------------------------ */
-/*  LVGL draw buffer — 20 lines partial rendering                     */
-/* ------------------------------------------------------------------ */
-
-#define LVGL_BUF_LINES      20
-#define LVGL_BUF_SIZE       (DISPLAY_H_RES * LVGL_BUF_LINES * sizeof(uint16_t))
 
 /* ================================================================== */
 /*  Target-specific pin assignments                                   */
@@ -44,15 +39,16 @@
 
 /* SPI Display */
 #define PIN_DISPLAY_MOSI    6
+#define PIN_DISPLAY_MISO    21
 #define PIN_DISPLAY_SCLK    4
 #define PIN_DISPLAY_CS      5
 #define PIN_DISPLAY_DC      7
 #define PIN_DISPLAY_RST     8
 #define PIN_DISPLAY_BL      9
 
-/* I2C Touch (reserved) */
-#define PIN_TOUCH_SDA       10
-#define PIN_TOUCH_SCL       20
+/* SPI Touch (XPT2046, shared SPI bus) */
+#define PIN_TOUCH_CS        10
+#define PIN_TOUCH_IRQ       20
 
 /* TWAI (CAN) */
 #define PIN_TWAI_TX         2
@@ -65,10 +61,10 @@
 #define ADC_SENSOR2_CHANNEL ADC_CHANNEL_1
 #define ADC_SENSOR_UNIT     ADC_UNIT_1
 
-/* Blinky — onboard WS2812 RGB LED + free GPIO outputs */
+/* Blinky — onboard WS2812 RGB LED (no extra GPIOs free) */
 #define BLINKY_WS2812_GPIO  8
-#define BLINKY_GPIO_PINS    { 21 }
-#define BLINKY_GPIO_COUNT   1
+#define BLINKY_GPIO_PINS    { 0 }
+#define BLINKY_GPIO_COUNT   0
 
 #elif CONFIG_IDF_TARGET_ESP32H2
 /* ------- ESP32-H2 SuperMini ------- */
@@ -78,15 +74,16 @@
 
 /* SPI Display */
 #define PIN_DISPLAY_MOSI    22
+#define PIN_DISPLAY_MISO    4
 #define PIN_DISPLAY_SCLK    10
 #define PIN_DISPLAY_CS      11
 #define PIN_DISPLAY_DC      23
 #define PIN_DISPLAY_RST     24
 #define PIN_DISPLAY_BL      25
 
-/* I2C Touch (reserved) */
-#define PIN_TOUCH_SDA       12
-#define PIN_TOUCH_SCL       13
+/* SPI Touch (XPT2046, shared SPI bus) */
+#define PIN_TOUCH_CS        12
+#define PIN_TOUCH_IRQ       13
 
 /* TWAI (CAN) */
 #define PIN_TWAI_TX         0
@@ -101,8 +98,8 @@
 
 /* Blinky — onboard WS2812 RGB LED + free GPIO outputs */
 #define BLINKY_WS2812_GPIO  8
-#define BLINKY_GPIO_PINS    { 4, 5, 9, 14 }
-#define BLINKY_GPIO_COUNT   4
+#define BLINKY_GPIO_PINS    { 5, 9, 14 }
+#define BLINKY_GPIO_COUNT   3
 
 #elif CONFIG_IDF_TARGET_ESP32C5
 /* ------- ESP32-C5 SuperMini ------- */
@@ -110,15 +107,16 @@
 
 /* SPI Display */
 #define PIN_DISPLAY_MOSI    6
+#define PIN_DISPLAY_MISO    12
 #define PIN_DISPLAY_SCLK    4
 #define PIN_DISPLAY_CS      5
 #define PIN_DISPLAY_DC      7
 #define PIN_DISPLAY_RST     8
 #define PIN_DISPLAY_BL      9
 
-/* I2C Touch (reserved) */
-#define PIN_TOUCH_SDA       10
-#define PIN_TOUCH_SCL       11
+/* SPI Touch (XPT2046, shared SPI bus) */
+#define PIN_TOUCH_CS        10
+#define PIN_TOUCH_IRQ       11
 
 /* TWAI (CAN) */
 #define PIN_TWAI_TX         2
@@ -133,8 +131,8 @@
 
 /* Blinky — onboard WS2812 RGB LED + free GPIO outputs */
 #define BLINKY_WS2812_GPIO  8
-#define BLINKY_GPIO_PINS    { 12, 13, 14, 15 }
-#define BLINKY_GPIO_COUNT   4
+#define BLINKY_GPIO_PINS    { 13, 14, 15 }
+#define BLINKY_GPIO_COUNT   3
 
 #else
 #error "Unsupported IDF target. Use esp32c3, esp32h2, or esp32c5."

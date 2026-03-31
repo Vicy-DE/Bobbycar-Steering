@@ -39,16 +39,16 @@
 | **GPIO1** | Input | **ADC Sensor 1** | ADC1_CH0 | 0–3.3 V analog input |
 | **GPIO2** | Input | **ADC Sensor 2** | ADC1_CH1 | Strapping pin — 0–3.3 V analog input |
 | **GPIO3** | Input | **TWAI RX (CAN)** | TWAI | Strapping pin, has ADC1_CH2 |
-| **GPIO4** | Input | **SPI MISO (Touch)** | SPI2 | XPT2046 touch data out |
+| **GPIO4** | Input | **SPI MISO / I2C SDA** | SPI2 / I2C | Variant 0: XPT2046 touch data out; Variant 1: FT6236 I2C SDA |
 | **GPIO5** | Output | **Blinky LED** | GPIO | Status LED |
 | **GPIO8** | Output | **Onboard WS2812 RGB LED** | RMT | Strapping pin; addressable LED via led_strip driver |
 | **GPIO9** | Output | **Blinky LED** | GPIO | Strapping pin; status LED |
-| **GPIO10** | Output | **SPI SCK (Display+Touch)** | SPI2 | ILI9488 + XPT2046 clock, 40 MHz |
-| **GPIO11** | Output | **SPI CS (Display)** | SPI2 | ILI9488 chip select (active low) |
-| **GPIO12** | Output | **SPI CS (Touch)** | SPI2 | XPT2046 chip select (active low) |
-| **GPIO13** | Input | **Touch IRQ** | GPIO | XPT2046 pen interrupt (optional, active low) |
+| **GPIO10** | Output | **SPI SCK (Display+Touch)** | SPI2 | Display clock, 40 MHz |
+| **GPIO11** | Output | **SPI CS (Display)** | SPI2 | Display chip select (active low) |
+| **GPIO12** | Output | **SPI CS / I2C SCL** | SPI2 / I2C | Variant 0: XPT2046 chip select; Variant 1: FT6236 I2C SCL |
+| **GPIO13** | Input | **Touch IRQ / INT** | GPIO | Variant 0: XPT2046 pen IRQ; Variant 1: FT6236 interrupt |
 | **GPIO14** | Output | **Blinky LED** | GPIO | Status LED |
-| **GPIO22** | Output | **SPI MOSI (Display+Touch)** | SPI2 | ILI9488 + XPT2046 data |
+| **GPIO22** | Output | **SPI MOSI (Display)** | SPI2 | Display data |
 | **GPIO23** | Output | **Display DC** | GPIO | Data/Command select |
 | **GPIO24** | Output | **Display RST** | GPIO | Hardware reset (active low) |
 | **GPIO25** | Output | **Display BL** | GPIO | Backlight on/off. Strapping pin |
@@ -61,19 +61,20 @@
 
 ## Peripheral Summary
 
-### SPI2 — Display (ILI9488 4.0" 480×320) + Touch (XPT2046)
+### SPI2 — Display + Touch (Variant 0: ILI9488+XPT2046, Variant 1: ST7796S+FT6236)
 
-| Parameter | Value |
-|-----------|-------|
-| Host | SPI2_HOST |
-| Display clock | 40 MHz |
-| Touch clock | 1 MHz |
-| Mode | SPI Mode 0 (CPOL=0, CPHA=0) |
-| Data width | 8-bit commands, 18-bit pixel data (RGB666) |
-| DMA | Auto-allocated |
-| MISO | GPIO4 (XPT2046 touch data only, display SDO not connected) |
-| Display CS | GPIO11 |
-| Touch CS | GPIO12 |
+| Parameter | Variant 0 (ILI9488) | Variant 1 (ST7796S) |
+|-----------|---------------------|---------------------|
+| Host | SPI2_HOST | SPI2_HOST |
+| Display clock | 40 MHz | 40 MHz |
+| Touch interface | SPI (1 MHz, shared bus) | I2C (400 kHz, separate bus) |
+| Pixel format | 18-bit RGB666 | 16-bit RGB565 |
+| DMA | Auto-allocated | Auto-allocated (zero-copy) |
+| MISO | GPIO4 (XPT2046 only) | Not used |
+| Display CS | GPIO11 | GPIO11 |
+| Touch CS/SCL | GPIO12 (SPI CS) | GPIO12 (I2C SCL) |
+| Touch IRQ/INT | GPIO13 | GPIO13 |
+| Touch SDA | — | GPIO4 (I2C SDA) |
 
 ### TWAI — CAN Bus
 
@@ -103,5 +104,6 @@
 4. **SiP flash variant:** GPIO6–7 are not available on boards with SiP flash. GPIO15–21 are used for SPI flash.
 5. **Blinky LEDs:** GPIO5, GPIO9, GPIO14 drive status LEDs. GPIO8 is used by the onboard WS2812 RGB LED.
 6. **Lower clock speed:** ESP32-H2 runs at 96 MHz. Display refresh rate may be slightly lower than C3/C5.
-7. **Shared SPI bus:** Display and touch share SPI2 (MOSI, MISO, SCK) with separate CS lines. The ESP-IDF SPI driver handles bus arbitration automatically.
-8. **Touch wiring:** See [connection.md](connection.md) for full wiring diagram between ILI9488 module and ESP32-H2 SuperMini.
+7. **Shared SPI bus (Variant 0):** Display and touch share SPI2 (MOSI, MISO, SCK) with separate CS lines. The ESP-IDF SPI driver handles bus arbitration automatically.
+8. **Separate I2C bus (Variant 1):** Touch uses I2C0 (GPIO4 SDA, GPIO12 SCL), completely separate from display SPI. No bus contention.
+9. **Touch wiring:** See [connection.md](connection.md) for ILI9488 (variant 0) or [connection_st7796s.md](connection_st7796s.md) for ST7796S (variant 1).

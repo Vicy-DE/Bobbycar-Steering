@@ -2,10 +2,9 @@
  * @file main.c
  * @brief Bobbycar-Steering application entry point.
  *
- * Cross-platform firmware for ESP32-H2, ESP32-C3, and ESP32-C5
- * SuperMini development boards. Reads two ADC analog sensor
- * channels and displays the values on a 4.0" ILI9488 SPI TFT
- * using LVGL with XPT2046 resistive touch input.
+ * Firmware for ESP32-H2 SuperMini.  Reads two ADC analog sensor
+ * channels and displays values on a 4.0" SPI TFT (ILI9488 or
+ * ST7796S, compile-time DISPLAY_VARIANT) using LVGL with touch.
  * Supports BLE gamepad input via Bluepad32.
  */
 
@@ -224,15 +223,7 @@ static void ui_create(void)
 
     /* Target info */
     lv_obj_t *label_target = lv_label_create(scr);
-#if CONFIG_IDF_TARGET_ESP32C3
-    lv_label_set_text(label_target, "ESP32-C3 | 160 MHz | Wi-Fi+BLE");
-#elif CONFIG_IDF_TARGET_ESP32H2
     lv_label_set_text(label_target, "ESP32-H2 | 96 MHz | BLE+802.15.4");
-#elif CONFIG_IDF_TARGET_ESP32C5
-    lv_label_set_text(label_target, "ESP32-C5 | 240 MHz | Wi-Fi6+BLE");
-#else
-    lv_label_set_text(label_target, "Unknown target");
-#endif
     lv_obj_set_style_text_color(label_target, lv_color_hex(0x888888),
                                 LV_PART_MAIN);
     lv_obj_align(label_target, LV_ALIGN_TOP_MID, 0, 50);
@@ -369,17 +360,9 @@ void app_main(void)
     esp_chip_info_t chip_info;
     esp_chip_info(&chip_info);
 
-    ESP_LOGI(TAG, "Bobbycar-Steering v0.7");
-
-#if CONFIG_IDF_TARGET_ESP32C3
-    ESP_LOGI(TAG, "Target: ESP32-C3 (RISC-V, 160 MHz, Wi-Fi + BLE 5)");
-#elif CONFIG_IDF_TARGET_ESP32H2
+    ESP_LOGI(TAG, "Bobbycar-Steering v0.8");
     ESP_LOGI(TAG, "Target: ESP32-H2 (RISC-V, 96 MHz, BLE 5 + 802.15.4)");
-#elif CONFIG_IDF_TARGET_ESP32C5
-    ESP_LOGI(TAG, "Target: ESP32-C5 (RISC-V, 240 MHz, Wi-Fi 6 + BLE 5 + 802.15.4)");
-#else
-    ESP_LOGI(TAG, "Target: Unknown ESP32 variant");
-#endif
+    ESP_LOGI(TAG, "Display variant: %d", DISPLAY_VARIANT);
 
     ESP_LOGI(TAG, "Cores: %d, Silicon revision: %d", chip_info.cores,
              chip_info.revision);
@@ -387,20 +370,34 @@ void app_main(void)
              (unsigned long)esp_get_free_heap_size());
 
     /* ---- Initialize display ---- */
+#if DISPLAY_VARIANT == 0
     esp_err_t ret = display_init(
         PIN_DISPLAY_MOSI, PIN_DISPLAY_MISO, PIN_DISPLAY_SCLK,
         PIN_DISPLAY_CS, PIN_DISPLAY_DC, PIN_DISPLAY_RST,
         PIN_DISPLAY_BL,
         DISPLAY_H_RES, DISPLAY_V_RES,
         DISPLAY_SPI_HOST, DISPLAY_SPI_FREQ_HZ);
+#elif DISPLAY_VARIANT == 1
+    esp_err_t ret = display_init(
+        PIN_DISPLAY_MOSI, PIN_DISPLAY_SCLK,
+        PIN_DISPLAY_CS, PIN_DISPLAY_DC, PIN_DISPLAY_RST,
+        PIN_DISPLAY_BL,
+        DISPLAY_H_RES, DISPLAY_V_RES,
+        DISPLAY_SPI_HOST, DISPLAY_SPI_FREQ_HZ);
+#endif
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Display init failed: %s", esp_err_to_name(ret));
         return;
     }
 
     /* ---- Initialize touch ---- */
+#if DISPLAY_VARIANT == 0
     ret = touch_init(DISPLAY_SPI_HOST, PIN_TOUCH_CS, PIN_TOUCH_IRQ,
                      DISPLAY_H_RES, DISPLAY_V_RES);
+#elif DISPLAY_VARIANT == 1
+    ret = touch_init(PIN_TOUCH_SDA, PIN_TOUCH_SCL, PIN_TOUCH_INT,
+                     DISPLAY_H_RES, DISPLAY_V_RES);
+#endif
     if (ret != ESP_OK) {
         ESP_LOGW(TAG, "Touch init failed: %s (continuing without touch)",
                  esp_err_to_name(ret));

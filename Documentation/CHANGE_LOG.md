@@ -1,5 +1,30 @@
 # Change Log — Bobbycar-Steering
 
+## [2026-03-31] ST7796S + FT6236 display variant, H2-only, RAM optimization
+
+### What was changed
+- `main/pin_config.h` — Removed all ESP32-C3/C5 sections; added `#if !CONFIG_IDF_TARGET_ESP32H2` compile error guard; added `DISPLAY_VARIANT` compile-time switch (0=ILI9488+XPT2046, 1=ST7796S+FT6236); GPIO4/12/13 repurposed per variant (SPI MISO/T_CS/T_IRQ vs I2C SDA/SCL/INT)
+- `CMakeLists.txt` (root) — Added `add_compile_definitions(DISPLAY_VARIANT=0)` after `project()` for compile-time display selection
+- `components/display/CMakeLists.txt` — Added `esp_driver_i2c` to PRIV_REQUIRES for FT6236 I2C touch
+- `components/display/include/display.h` — Rewritten with `#if DISPLAY_VARIANT` conditional API; variant 0: `display_init()` with MISO + `touch_init()` with SPI host/CS/IRQ; variant 1: `display_init()` without MISO + `touch_init()` with I2C SDA/SCL/INT
+- `components/display/display.c` — Major rewrite: variant 0 retains ILI9488 18-bit RGB666 + XPT2046 (LVGL_BUF_LINES=6, 20160 bytes); variant 1 adds ST7796S 16-bit RGB565 zero-copy DMA + FT6236 I2C capacitive touch (LVGL_BUF_LINES=10, 19200 bytes); `#if DISPLAY_VARIANT` blocks throughout; added FT6236 I2C read via ESP-IDF v5.4 `i2c_master` API
+- `main/main.c` — Removed C3/C5 target `#if` blocks; simplified to H2-only; added `#if DISPLAY_VARIANT` for display_init/touch_init parameter selection; version bumped to v0.8
+- `Documentation/connection_st7796s.md` — Created wiring guide with ASCII art diagrams for ST7796S+FT6236 → ESP32-H2 SuperMini; includes comparison table (ILI9488 vs ST7796S)
+
+### Why it was changed
+Added ST7796S 4.0" SPI TFT with FT6236 capacitive touch as a second display option. ST7796S supports native 16-bit RGB565 over SPI (no conversion buffer needed), and the capacitive touch uses I2C on a separate bus (no SPI contention). Removed ESP32-C3 and ESP32-C5 targets to simplify project (only H2 SuperMini boards are used).
+
+### What it does / expected behaviour
+- DISPLAY_VARIANT=0: ILI9488 + XPT2046 (existing hardware) — no behaviour change
+- DISPLAY_VARIANT=1: ST7796S + FT6236 — zero-copy DMA (2 bytes/pixel vs 3), no conversion buffer, 10-line LVGL bufs (vs 6), total 19200 bytes (saves 960 vs variant 0), capacitive touch on I2C (addr 0x38, factory-calibrated)
+- Same 9 GPIOs used by both variants (4/12/13 repurposed SPI↔I2C)
+- Project now H2-only — compile error if target is not ESP32-H2
+
+### Verified
+- Build: OK — ESP32-H2, `idf.py build` (1756/1756), DISPLAY_VARIANT=0
+- Flash: OK — COM14, hash verified
+- Debug: OK — Serial output: "Bobbycar-Steering v0.8", "Display variant: 0", "ILI9488 display (480x320)", "6-line bufs, 18-bit RGB666, total 20160 bytes", "XPT2046 touch (CS=12, IRQ=13)", Bluepad32+BLE running, 73.9 KB free heap
+
 ## [2026-03-30] ILI9488 Display Port + XPT2046 Touch Input
 
 ### What was changed

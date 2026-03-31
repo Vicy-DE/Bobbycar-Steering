@@ -14,6 +14,11 @@ include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 
 project(bobbycar-steering)
 
+# Display hardware variant (visible to all components):
+#   0 = ILI9488 4.0" + XPT2046 resistive SPI touch  (18-bit RGB666)
+#   1 = ST7796S 4.0" + FT6236 capacitive I2C touch   (16-bit RGB565)
+add_compile_definitions(DISPLAY_VARIANT=0)
+
 # Suppress format warnings in third-party Bluepad32 / BTstack components.
 # RISC-V toolchain defines int32_t as 'long int', causing -Wformat errors
 # when %d is used for int32_t in Bluepad32 source.
